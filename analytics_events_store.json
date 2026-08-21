@@ -1,9 +1,9 @@
 {
-  "updatedAt": "2026-08-21T04:06:16.975Z",
+  "updatedAt": "2026-08-21T04:15:38.823Z",
   "dailySummaries": {
     "2026-08-21": {
       "date": "2026-08-21",
-      "visits": 1,
+      "visits": 0,
       "uniqueVisitors": 1,
       "visitorIds": [
         "v_rogtcmo85_mt2f61jc"
@@ -23,7 +23,7 @@
   },
   "recentEvents": [
     {
-      "eventId": "page_view_u2nwte_1787284707555",
+      "eventId": "page_view_kirmhu_1787285313901",
       "sessionId": "s_q92z7odxd_mt2f61je",
       "visitorId": "v_rogtcmo85_mt2f61jc",
       "userId": null,
@@ -31,48 +31,8 @@
       "eventType": "page_view",
       "path": "/",
       "title": "TAZU MART BD - Premium Fashion & Lifestyle",
-      "referrer": "https://ais-dev-bprxi4s6ojh56gigyoabm3-918145641738.asia-southeast1.run.app/",
-      "timestamp": "2026-08-21T03:58:27.555Z",
-      "dateString": "2026-08-21",
-      "device": {
-        "isMobile": true,
-        "screen": "0x0",
-        "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Mobile Safari/537.36"
-      },
-      "metadata": {},
-      "ip": "103.16.250.19"
-    },
-    {
-      "eventId": "session_start_ohv52m_1787284707551",
-      "sessionId": "s_q92z7odxd_mt2f61je",
-      "visitorId": "v_rogtcmo85_mt2f61jc",
-      "userId": null,
-      "userName": null,
-      "eventType": "session_start",
-      "path": "/",
-      "title": "TAZU MART BD - Premium Fashion & Lifestyle",
-      "referrer": "https://ais-dev-bprxi4s6ojh56gigyoabm3-918145641738.asia-southeast1.run.app/",
-      "timestamp": "2026-08-21T03:58:27.551Z",
-      "dateString": "2026-08-21",
-      "device": {
-        "isMobile": true,
-        "screen": "0x0",
-        "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Mobile Safari/537.36"
-      },
-      "metadata": {},
-      "ip": "103.16.250.19"
-    },
-    {
-      "eventId": "page_view_3cp8eu_1787284721187",
-      "sessionId": "s_q92z7odxd_mt2f61je",
-      "visitorId": "v_rogtcmo85_mt2f61jc",
-      "userId": null,
-      "userName": null,
-      "eventType": "page_view",
-      "path": "/category/final_test_cat_1787216858959",
-      "title": "TAZU MART BD - Premium Lifetime Collection",
-      "referrer": "https://ais-dev-bprxi4s6ojh56gigyoabm3-918145641738.asia-southeast1.run.app/",
-      "timestamp": "2026-08-21T03:58:41.187Z",
+      "referrer": "https://aistudio.google.com/",
+      "timestamp": "2026-08-21T04:08:33.900Z",
       "dateString": "2026-08-21",
       "device": {
         "isMobile": true,
@@ -80,27 +40,7 @@
         "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Mobile Safari/537.36"
       },
       "metadata": {},
-      "ip": "103.16.250.19"
-    },
-    {
-      "eventId": "page_view_jsay9o_1787284721960",
-      "sessionId": "s_q92z7odxd_mt2f61je",
-      "visitorId": "v_rogtcmo85_mt2f61jc",
-      "userId": null,
-      "userName": null,
-      "eventType": "page_view",
-      "path": "/",
-      "title": "Final Production Routing Test Collection & Price in Bangladesh | TAZU MART BD",
-      "referrer": "https://ais-dev-bprxi4s6ojh56gigyoabm3-918145641738.asia-southeast1.run.app/",
-      "timestamp": "2026-08-21T03:58:41.960Z",
-      "dateString": "2026-08-21",
-      "device": {
-        "isMobile": true,
-        "screen": "403x699",
-        "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Mobile Safari/537.36"
-      },
-      "metadata": {},
-      "ip": "103.16.250.19"
+      "ip": "103.16.250.30"
     }
   ]
 }
