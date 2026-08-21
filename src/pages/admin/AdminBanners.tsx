@@ -1,0 +1,1239 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
+import { 
+  Upload, 
+  ChevronLeft, 
+  Search, 
+  X, 
+  Check, 
+  Loader2, 
+  Image as ImageIcon,
+  User,
+  Sliders,
+  Sparkles,
+  Layers,
+  LayoutGrid,
+  Tag,
+  AlertCircle
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { toast } from 'react-hot-toast';
+import { cn } from '../../lib/utils';
+import { useBannerStore, Banner } from '../../store/useBannerStore';
+import { useProductStore } from '../../store/useProductStore';
+import { useCategoryStore } from '../../store/useCategoryStore';
+import { useBrandingStore } from '../../store/useBrandingStore';
+import { uploadImage } from '../../lib/imageUtils';
+import { getDb } from '../../lib/db';
+import { loginBannerService } from '../../services/loginBannerService';
+import UnsavedChangesDialog from '../../components/common/UnsavedChangesDialog';
+
+interface LocalPreview {
+  id: string;
+  file: File;
+  previewUrl: string;
+  croppedBlob: Blob;
+  width?: number;
+  height?: number;
+}
+
+export type BannerCategoryType = 'main' | 'category' | 'login';
+
+export default function AdminBanners() {
+  const { banners, updateBanner } = useBannerStore();
+  const { categories, subscribe: subscribeCategories } = useCategoryStore();
+  const { settings: branding, updateBranding, isLoaded: isBrandingLoaded } = useBrandingStore();
+  const products = useProductStore((state) => state.products) || [];
+  
+  const [searchParams] = useSearchParams();
+  const editId = searchParams.get('editId');
+  const navigate = useNavigate();
+
+  // Banner Type Selector: 'main' (Main Banner), 'category' (Category Banner), 'login' (Login Banner)
+  const [bannerCategory, setBannerCategory] = useState<BannerCategoryType>('main');
+  const [selectedCategoryId, setSelectedCategoryId] = useState('');
+
+  // Form Fields State
+  const [name, setName] = useState('');
+  const [offerText, setOfferText] = useState('');
+  const [description, setDescription] = useState('');
+  const [buttonText, setButtonText] = useState('Shop Now');
+  const [buttonLink, setButtonLink] = useState('');
+  const [connectedProductId, setConnectedProductId] = useState('');
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle');
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [savingStep, setSavingStep] = useState<string>('');
+
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
+  const [localPreviews, setLocalPreviews] = useState<LocalPreview[]>([]);
+
+  // Default Character Management States
+  const [maleImage, setMaleImage] = useState('');
+  const [femaleImage, setFemaleImage] = useState('');
+  const [guestImage, setGuestImage] = useState('');
+  const [characterUploadingSlot, setCharacterUploadingSlot] = useState<'male' | 'female' | 'guest' | null>(null);
+
+  // Unsaved changes state
+  const [isDirty, setIsDirty] = useState(false);
+  const [showLeaveDialog, setShowLeaveDialog] = useState(false);
+  const [pendingNavigationPath, setPendingNavigationPath] = useState<string | null>(null);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const characterFileInputRef = useRef<HTMLInputElement>(null);
+  const [activeCharacterUploadSlot, setActiveCharacterUploadSlot] = useState<'male' | 'female' | 'guest' | null>(null);
+
+  // Subscribe to category store
+  useEffect(() => {
+    const unsub = subscribeCategories();
+    return () => unsub();
+  }, [subscribeCategories]);
+
+  // Load existing character avatars from branding store
+  useEffect(() => {
+    if (isBrandingLoaded || branding) {
+      setMaleImage(branding.male_profile_image || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&auto=format&fit=crop&q=80');
+      setFemaleImage(branding.female_profile_image || 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&auto=format&fit=crop&q=80');
+      setGuestImage(branding.default_profile_image || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80');
+    }
+  }, [branding, isBrandingLoaded]);
+
+  // Load banner data if editId is provided
+  useEffect(() => {
+    if (editId) {
+      const bannerToEdit = banners.find(b => b.id === editId);
+      if (bannerToEdit) {
+        setName(bannerToEdit.name || '');
+        setOfferText(bannerToEdit.offerText || '');
+        setDescription(bannerToEdit.description || '');
+        setButtonText(bannerToEdit.buttonText || 'Shop Now');
+        setButtonLink(bannerToEdit.buttonLink || '');
+        setConnectedProductId(bannerToEdit.connectedProductId || '');
+        setSelectedCategoryId(bannerToEdit.categoryId || bannerToEdit.connectedCategoryId || '');
+        
+        if (bannerToEdit.bannerType === 'login_banner' || bannerToEdit.bannerCategory === 'login' || bannerToEdit.bannerCategory === 'login_banner') {
+          setBannerCategory('login');
+        } else if (bannerToEdit.bannerType === 'category_banner' || bannerToEdit.bannerCategory === 'category_banner' || bannerToEdit.categoryId || bannerToEdit.connectedCategoryId) {
+          setBannerCategory('category');
+        } else {
+          setBannerCategory('main');
+        }
+      }
+    } else {
+      setName('');
+      setOfferText('');
+      setDescription('');
+      setButtonText('Shop Now');
+      setButtonLink('');
+      setConnectedProductId('');
+      setSelectedCategoryId('');
+    }
+  }, [editId, banners]);
+
+  // Clean up Object URLs on unmount
+  useEffect(() => {
+    return () => {
+      localPreviews.forEach(p => URL.revokeObjectURL(p.previewUrl));
+    };
+  }, [localPreviews]);
+
+  // Navigation leave confirmation handlers
+  const handleConfirmLeave = () => {
+    setIsDirty(false);
+    setShowLeaveDialog(false);
+    navigate(pendingNavigationPath || '/admin/banner/list', { replace: true });
+  };
+
+  const handleCancelLeave = () => {
+    setShowLeaveDialog(false);
+    setPendingNavigationPath(null);
+  };
+
+  // Drag & drop handlers for banner image
+  const handleDrag = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      handleImageFiles(Array.from(e.dataTransfer.files));
+      setIsDirty(true);
+    }
+  };
+
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      handleImageFiles(Array.from(e.target.files));
+      setIsDirty(true);
+    }
+  };
+
+  const handleRemovePreview = (id: string) => {
+    setIsDirty(true);
+    setLocalPreviews((prev) => {
+      const target = prev.find(item => item.id === id);
+      if (target) {
+        URL.revokeObjectURL(target.previewUrl);
+      }
+      return prev.filter(item => item.id !== id);
+    });
+  };
+
+  const handleImageFiles = async (files: File[]) => {
+    setIsProcessing(true);
+    const newPreviews: LocalPreview[] = [];
+
+    for (const file of files) {
+      if (!file.type.startsWith('image/')) {
+        toast.error(`❌ ${file.name} is not an image!`);
+        continue;
+      }
+      
+      try {
+        const { blob, width, height } = await new Promise<{ blob: Blob; width: number; height: number }>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+              const naturalW = img.naturalWidth || img.width;
+              const naturalH = img.naturalHeight || img.height;
+              // Preserve original file directly without forced cropping/locking
+              resolve({ blob: file, width: naturalW, height: naturalH });
+            };
+            img.onerror = () => reject('Image load failed');
+            img.src = e.target?.result as string;
+          };
+          reader.onerror = () => reject('File read failed');
+          reader.readAsDataURL(file);
+        });
+
+        const previewUrl = URL.createObjectURL(blob);
+        newPreviews.push({
+          id: `preview_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          file,
+          previewUrl,
+          croppedBlob: blob,
+          width,
+          height
+        });
+      } catch (err) {
+        console.error("Image processing error:", err);
+        toast.error(`❌ Could not process ${file.name}`);
+      }
+    }
+
+    setLocalPreviews((prev) => [...prev, ...newPreviews]);
+    setIsProcessing(false);
+  };
+
+  const handleSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+
+    const isLogin = bannerCategory === 'login';
+    const isCategory = bannerCategory === 'category';
+    const bannerTypeVal = isLogin ? 'login_banner' : (isCategory ? 'category_banner' : 'main_banner');
+
+    if (isCategory && !selectedCategoryId && !editId) {
+      toast.error('⚠️ Please select a target Category for this Category Banner.');
+      return;
+    }
+
+    setSaveStatus('saving');
+    setSaveError(null);
+    setSavingStep('Initializing save sequence...');
+
+    if (editId) {
+      // Editing single banner
+      console.log("Updating single banner...");
+      try {
+        let imageUrl: string | undefined = undefined;
+        let originalW: number | undefined = undefined;
+        let originalH: number | undefined = undefined;
+
+        if (localPreviews.length > 0) {
+          setSavingStep('Uploading banner image...');
+          imageUrl = await uploadImage(localPreviews[0].croppedBlob, 'banners', localPreviews[0].file.name);
+          originalW = localPreviews[0].width;
+          originalH = localPreviews[0].height;
+        }
+
+        const selectedCatObj = categories.find(c => c.id === selectedCategoryId);
+        const catName = selectedCatObj?.name || '';
+
+        const updates: Partial<Banner> = {
+          name: name.trim() || (isLogin ? 'Login Banner' : (isCategory ? `${catName || 'Category'} Banner` : 'Main Banner')),
+          offerText: offerText.trim(),
+          description: description.trim(),
+          buttonText: buttonText.trim(),
+          buttonLink: buttonLink.trim() || (isCategory && selectedCategoryId ? `/category/${selectedCategoryId}` : ''),
+          buttonEnabled: !!buttonText.trim() && (!!buttonLink.trim() || isCategory),
+          connectedProductId: connectedProductId || undefined,
+          categoryId: isCategory ? selectedCategoryId : undefined,
+          connectedCategoryId: isCategory ? selectedCategoryId : undefined,
+          categoryName: isCategory ? catName : undefined,
+          bannerType: bannerTypeVal,
+          bannerCategory: bannerTypeVal,
+          mediaType: 'banner'
+        };
+
+        if (imageUrl) {
+          updates.image = imageUrl;
+          if (originalW) updates.originalWidth = originalW;
+          if (originalH) updates.originalHeight = originalH;
+        }
+
+        setSavingStep('Saving updates to database...');
+        await updateBanner(editId, updates);
+
+        // If this is a login banner, also keep branding.login_banner in sync
+        if (isLogin && imageUrl) {
+          setSavingStep('Syncing login banner with branding...');
+          await updateBranding({ login_banner: imageUrl });
+        }
+
+        setSaveStatus('saved');
+        toast.success(`Banner (${bannerTypeVal.toUpperCase().replace('_', ' ')}) updated successfully!`);
+        setIsDirty(false);
+        setTimeout(() => navigate('/admin/banner/list'), 1500);
+      } catch (err: any) {
+        console.error(err);
+        setSaveStatus('failed');
+        setSaveError(err.message || String(err));
+        toast.error('Failed to update banner.');
+      } finally {
+        setSavingStep('');
+      }
+      return;
+    }
+
+    // Creating new banners
+    if (localPreviews.length === 0 && bannerCategory !== 'login') {
+      setSaveStatus('idle');
+      toast.error('⚠️ Please select or drop at least one banner image.');
+      return;
+    }
+
+    let successCount = 0;
+
+    try {
+      // 1. Always sync profile characters (Male, Female, Guest) to database & backend API if Login Banner
+      if (bannerCategory === 'login') {
+        setSavingStep('Syncing account characters...');
+        const charactersPayload = {
+          male_profile_image: maleImage.trim(),
+          female_profile_image: femaleImage.trim(),
+          default_profile_image: guestImage.trim(),
+        };
+        await updateBranding(charactersPayload);
+        try {
+          await fetch('/api/account-characters', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(charactersPayload)
+          });
+        } catch (cApiErr) {
+          console.warn("Account characters API sync note:", cApiErr);
+        }
+      }
+
+      const currentBannersLength = useBannerStore.getState().banners.length;
+      const newBanners: Banner[] = [];
+
+      const selectedCatObj = categories.find(c => c.id === selectedCategoryId);
+      const catName = selectedCatObj?.name || '';
+
+      if (localPreviews.length > 0) {
+        setSavingStep(`Uploading ${localPreviews.length} banner images...`);
+        for (let i = 0; i < localPreviews.length; i++) {
+          const item = localPreviews[i];
+          try {
+            setSavingStep(`Uploading banner ${i + 1}/${localPreviews.length}...`);
+            const downloadUrl = await uploadImage(item.croppedBlob, 'banners', item.file.name);
+            const targetId = isCategory 
+              ? `ban_cat_${Date.now()}_${Math.floor(Math.random() * 1000)}` 
+              : `ban_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+            const currentOrder = currentBannersLength + successCount;
+
+            const bannerData: Banner = {
+              id: targetId,
+              image: downloadUrl,
+              name: name.trim() || (isLogin ? 'Login Banner' : (isCategory ? `${catName || 'Category'} Banner` : 'Main Banner')),
+              offerText: offerText.trim(),
+              description: description.trim(),
+              buttonText: buttonText.trim() || (isCategory ? 'Explore Category' : 'Shop Now'),
+              buttonLink: buttonLink.trim() || (isCategory && selectedCategoryId ? `/category/${selectedCategoryId}` : ''),
+              buttonEnabled: true,
+              connectedProductId: connectedProductId || undefined,
+              categoryId: isCategory ? selectedCategoryId : undefined,
+              connectedCategoryId: isCategory ? selectedCategoryId : undefined,
+              categoryName: isCategory ? catName : undefined,
+              originalWidth: item.width,
+              originalHeight: item.height,
+              isCustomButtonText: true,
+              locations: isLogin ? ['auth-page'] : (isCategory ? ['category-page'] : ['homepage-hero']),
+              bannerSize: 'hero',
+              status: 'active',
+              order: currentOrder,
+              bannerType: bannerTypeVal,
+              bannerCategory: bannerTypeVal,
+              mediaType: 'banner',
+              createdDate: new Date().toISOString()
+            };
+
+            newBanners.push(bannerData);
+
+            if (isLogin) {
+              setSavingStep(`Saving login banner metadata...`);
+              const savedRec = await loginBannerService.saveLoginBanner({
+                title: bannerData.name,
+                image_url: downloadUrl,
+                is_active: true,
+                sort_order: currentOrder
+              });
+              if (savedRec?.id) {
+                bannerData.id = savedRec.id;
+              }
+              await updateBranding({ login_banner: downloadUrl });
+            }
+
+            successCount++;
+          } catch (innerErr) {
+            console.error(innerErr);
+            toast.error(`❌ Failed to upload ${item.file.name}`);
+          }
+        }
+      } else if (bannerCategory === 'login') {
+        setSavingStep('Updating login banner branding...');
+        const currentBranding = useBrandingStore.getState().settings;
+        const bannerUrlToSave = (currentBranding.login_banner || '').trim();
+        if (bannerUrlToSave) {
+          await loginBannerService.saveLoginBanner({
+            title: name.trim() || 'Login Banner',
+            image_url: bannerUrlToSave,
+            is_active: true
+          });
+          await updateBranding({ login_banner: bannerUrlToSave });
+        }
+        await useBannerStore.getState().fetchAllBanners();
+        setSaveStatus('saved');
+        toast.success('🎉 Login Banner & Account Profile Characters saved successfully!');
+        setIsDirty(false);
+        setTimeout(() => navigate('/admin/banner/list'), 1500);
+        return;
+      }
+
+      if (successCount > 0) {
+        if (bannerCategory !== 'login') {
+          setSavingStep('Syncing banners with Hostinger MySQL...');
+          // POST API directly persists to database 'banners' table and syncs 'categories' table
+          const apiRes = await fetch('/api/banners', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ banners: newBanners })
+          });
+          if (!apiRes.ok) {
+            const errData = await apiRes.json().catch(() => ({}));
+            throw new Error(errData.error || `Failed to save banner to database (Status: ${apiRes.status})`);
+          }
+
+          const db = getDb();
+          if (db) {
+            const allMainBanners = [
+              ...useBannerStore.getState().banners.filter(b => b.bannerCategory !== 'login' && b.bannerCategory !== 'login_banner' && !newBanners.some(nb => nb.id === b.id)), 
+              ...newBanners
+            ];
+            try {
+              await db.from('settings').upsert({
+                id: 'main_hero_banners',
+                value: JSON.stringify(allMainBanners)
+              });
+            } catch (sbErr: any) {
+              console.warn("Supabase banner settings save notice:", sbErr);
+            }
+          }
+        }
+
+        setSavingStep('Finalizing and refreshing state...');
+        // Re-fetch authoritative banners & categories state from server
+        await useBannerStore.getState().fetchAllBanners();
+        await useCategoryStore.getState().fetchCategories?.();
+        
+        localPreviews.forEach(p => URL.revokeObjectURL(p.previewUrl));
+        setLocalPreviews([]);
+        
+        const typeLabel = bannerCategory === 'login' ? 'Login Banner' : (bannerCategory === 'category' ? 'Category Banner' : 'Main Banner');
+        setSaveStatus('saved');
+        toast.success(`🎉 ${successCount} ${typeLabel} saved to database successfully.`);
+        
+        setIsDirty(false);
+        setTimeout(() => navigate('/admin/banner/list'), 1500);
+      } else {
+        setSaveStatus('idle');
+      }
+    } catch (err: any) {
+      console.error("handleSubmit error:", err);
+      setSaveStatus('failed');
+      setSaveError(err.message || String(err));
+      toast.error('Failed to save banner. Please try again.');
+    } finally {
+      setSavingStep('');
+    }
+  };
+
+  // Profile character slot click handler
+  const handleCharacterSlotClick = (slot: 'male' | 'female' | 'guest') => {
+    setActiveCharacterUploadSlot(slot);
+    if (characterFileInputRef.current) {
+      characterFileInputRef.current.value = '';
+      characterFileInputRef.current.click();
+    }
+  };
+
+  // Upload character file to cloud/local storage
+  const handleCharacterFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    const slot = activeCharacterUploadSlot;
+    if (!file || !slot) return;
+
+    setCharacterUploadingSlot(slot);
+    try {
+      const downloadUrl = await uploadImage(file, 'characters', `character_${slot}_${Date.now()}`);
+      if (downloadUrl) {
+        let newMale = maleImage;
+        let newFemale = femaleImage;
+        let newGuest = guestImage;
+
+        if (slot === 'male') {
+          newMale = downloadUrl;
+          setMaleImage(downloadUrl);
+          await updateBranding({ male_profile_image: downloadUrl });
+        } else if (slot === 'female') {
+          newFemale = downloadUrl;
+          setFemaleImage(downloadUrl);
+          await updateBranding({ female_profile_image: downloadUrl });
+        } else if (slot === 'guest') {
+          newGuest = downloadUrl;
+          setGuestImage(downloadUrl);
+          await updateBranding({ default_profile_image: downloadUrl });
+        }
+
+        try {
+          await fetch('/api/account-characters', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              male_profile_image: newMale,
+              female_profile_image: newFemale,
+              default_profile_image: newGuest,
+            })
+          });
+        } catch (apiE) {
+          console.warn("Account character upload API sync note:", apiE);
+        }
+
+        toast.success(`✅ ${slot.toUpperCase()} Character updated successfully!`);
+      }
+    } catch (err: any) {
+      console.error(`Failed to upload ${slot} character:`, err);
+      toast.error(`❌ Upload failed: ${err.message || 'Error'}`);
+    } finally {
+      setCharacterUploadingSlot(null);
+      if (characterFileInputRef.current) {
+        characterFileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleResetCharacterSlot = async (slot: 'male' | 'female' | 'guest') => {
+    try {
+      let newMale = maleImage;
+      let newFemale = femaleImage;
+      let newGuest = guestImage;
+
+      if (slot === 'male') {
+        newMale = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&auto=format&fit=crop&q=80';
+        setMaleImage(newMale);
+        await updateBranding({ male_profile_image: newMale });
+      } else if (slot === 'female') {
+        newFemale = 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&auto=format&fit=crop&q=80';
+        setFemaleImage(newFemale);
+        await updateBranding({ female_profile_image: newFemale });
+      } else if (slot === 'guest') {
+        newGuest = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80';
+        setGuestImage(newGuest);
+        await updateBranding({ default_profile_image: newGuest });
+      }
+
+      try {
+        await fetch('/api/account-characters', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            male_profile_image: newMale,
+            female_profile_image: newFemale,
+            default_profile_image: newGuest,
+          })
+        });
+      } catch (apiE) {}
+
+      toast.success(`Reset ${slot.toUpperCase()} to standard avatar`);
+    } catch (e) {
+      toast.error("Failed to reset slot");
+    }
+  };
+
+  return (
+    <div id="admin-banner-control" className="w-full max-w-5xl mx-auto px-3 sm:px-6 space-y-6 font-sans pb-24 text-left">
+      
+      {/* Top Header & Back Link */}
+      <div className="flex justify-between items-center pt-2">
+        <button 
+          type="button" 
+          onClick={() => {
+            if (isDirty) {
+              setPendingNavigationPath('/admin/banner/list');
+              setShowLeaveDialog(true);
+            } else {
+              navigate('/admin/banner/list');
+            }
+          }} 
+          className="text-xs font-black tracking-wider uppercase text-neutral-600 hover:text-black flex items-center gap-1.5 transition-colors cursor-pointer"
+        >
+          &larr; Back to Banners
+        </button>
+      </div>
+
+      {/* Hidden file input for characters */}
+      <input 
+        ref={characterFileInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleCharacterFileChange}
+        className="hidden"
+      />
+
+      <div className="space-y-6" onChange={() => setIsDirty(true)}>
+
+        {/* ======================================================================= */}
+        {/* SECTION 1: BANNER CONTROL (Main vs Category vs Login Selection)         */}
+        {/* ======================================================================= */}
+        <div className="bg-white border border-zinc-200 rounded-none p-4 md:p-6 space-y-4 shadow-xs">
+          <div className="border-b border-zinc-100 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <h3 className="text-xs font-black text-black uppercase tracking-wider">
+                BANNER CONTROL — MEDIA TYPE SELECTION
+              </h3>
+              <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider mt-0.5">
+                Choose banner destination type before uploading image
+              </p>
+            </div>
+
+            {/* Type selector toggle pills */}
+            <div className="flex items-center gap-1.5 p-1 bg-zinc-100 border border-zinc-200 self-start sm:self-auto flex-wrap">
+              <button
+                type="button"
+                onClick={() => {
+                  setBannerCategory('main');
+                  setIsDirty(true);
+                }}
+                className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                  bannerCategory === 'main' 
+                    ? 'bg-black text-white shadow-xs' 
+                    : 'text-neutral-600 hover:text-black'
+                }`}
+              >
+                Main Banner
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setBannerCategory('category');
+                  setIsDirty(true);
+                }}
+                className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                  bannerCategory === 'category' 
+                    ? 'bg-emerald-600 text-white shadow-xs' 
+                    : 'text-neutral-600 hover:text-black'
+                }`}
+              >
+                Category Banner
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setBannerCategory('login');
+                  setIsDirty(true);
+                }}
+                className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                  bannerCategory === 'login' 
+                    ? 'bg-black text-white shadow-xs' 
+                    : 'text-neutral-600 hover:text-black'
+                }`}
+              >
+                Login Banner
+              </button>
+            </div>
+          </div>
+
+          {/* If Category Banner is selected: Category Selector Dropdown */}
+          {bannerCategory === 'category' && (
+            <div className="p-4 bg-emerald-50/50 border border-emerald-200 space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="block text-[10px] font-black uppercase tracking-wider text-emerald-900">
+                  Select Target Category <span className="text-rose-500 font-bold">*</span>
+                </label>
+                <span className="text-[9px] font-bold text-emerald-700 uppercase">
+                  Direct database sync to Category & Banner records
+                </span>
+              </div>
+              <select
+                value={selectedCategoryId}
+                onChange={(e) => {
+                  setSelectedCategoryId(e.target.value);
+                  setIsDirty(true);
+                }}
+                className="w-full px-3 py-2.5 bg-white border border-emerald-300 focus:outline-none focus:border-emerald-600 font-bold text-xs uppercase text-black cursor-pointer"
+              >
+                <option value="">-- Choose Category --</option>
+                {categories.map(cat => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.name} ({cat.slug})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Banner Upload Box */}
+          <div className="space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+              <span className="text-[10px] font-black uppercase tracking-wider text-neutral-800">
+                1. Upload {bannerCategory === 'login' ? 'Login Banner Image' : (bannerCategory === 'category' ? 'Category Banner Image' : 'Main Slideshow Image')} <span className="text-rose-500 font-bold">*</span>
+              </span>
+              <span className="text-[9px] font-mono font-bold text-neutral-800 uppercase bg-zinc-100 border border-zinc-300 px-2.5 py-1">
+                {bannerCategory === 'login' 
+                  ? 'Recommended: 1536 × 1024 px (Aspect Ratio: 3:2)' 
+                  : (bannerCategory === 'category'
+                      ? 'Original Resolution Preserved (Recommended: 1920 × 650 px)'
+                      : 'Recommended: 1920 × 650 px (Hero Slideshow)')}
+              </span>
+            </div>
+
+            <div 
+              onDragEnter={handleDrag}
+              onDragOver={handleDrag}
+              onDragLeave={handleDrag}
+              onDrop={handleDrop}
+              onClick={() => fileInputRef.current?.click()}
+              className={`border-2 border-dashed rounded-none flex flex-col items-center justify-center cursor-pointer transition-all w-full p-6 text-center ${
+                bannerCategory === 'login' ? 'min-h-[220px] md:min-h-[260px]' : 'min-h-[180px]'
+              } ${
+                dragActive 
+                  ? 'border-black bg-zinc-50 scale-[0.99]' 
+                  : 'border-zinc-200 bg-zinc-50/50 hover:border-black hover:bg-zinc-50'
+              }`}
+            >
+              <input 
+                type="file"
+                multiple
+                ref={fileInputRef}
+                onChange={handleFileInputChange}
+                accept="image/*"
+                className="hidden"
+                id="banner-image-uploader"
+              />
+              {isProcessing ? (
+                <div className="flex flex-col items-center justify-center py-4">
+                  <Loader2 className="w-6 h-6 animate-spin text-black mb-2" />
+                  <span className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest animate-pulse">Processing Image...</span>
+                </div>
+              ) : (
+                <>
+                  <Upload className="w-7 h-7 text-neutral-400 mb-2.5" />
+                  <span className="text-[11px] font-black uppercase text-black tracking-wider">
+                    Drag {bannerCategory === 'login' ? 'Login Banner' : (bannerCategory === 'category' ? 'Category Banner' : 'Main Banner')} Image Here or Browse
+                  </span>
+                  
+                  {bannerCategory === 'category' ? (
+                    <div className="mt-2 space-y-1">
+                      <span className="inline-block bg-emerald-600 text-white text-[9px] font-black uppercase px-2.5 py-0.5 tracking-wider">
+                        Original Resolution & Aspect Ratio অক্ষুণ্ণ রেখে সরাসরি আপলোড হবে
+                      </span>
+                      <p className="text-[8px] text-zinc-500 uppercase tracking-widest font-bold block">
+                        No forced crop or aspect ratio lock. Recommended: 1920 × 650 px
+                      </p>
+                    </div>
+                  ) : bannerCategory === 'login' ? (
+                    <div className="mt-2 space-y-1">
+                      <span className="inline-block bg-black text-white text-[9px] font-black uppercase px-2.5 py-0.5 tracking-wider">
+                        এই সাইজের ব্যানার আপলোড করুন: 1536 × 1024 px (3:2)
+                      </span>
+                      <p className="text-[8px] text-zinc-500 uppercase tracking-widest font-bold block">
+                        Maintains 3:2 visual proportion across Create Account, Login & Member headers
+                      </p>
+                    </div>
+                  ) : (
+                    <span className="text-[8px] text-zinc-400 uppercase tracking-widest mt-1 font-bold">
+                      Used in Storefront Homepage hero carousel (1920 × 650 px)
+                    </span>
+                  )}
+                </>
+              )}
+            </div>
+
+            {/* Selected local preview list */}
+            {localPreviews.length > 0 && (
+              <div className="pt-3 border-t border-zinc-100">
+                <div className="flex items-center justify-between text-[8px] font-black text-zinc-400 uppercase tracking-widest mb-2">
+                  <span>Selected Images ({localPreviews.length})</span>
+                  <span>Target: {bannerCategory.toUpperCase()} BANNER</span>
+                </div>
+                <div className="flex gap-3 overflow-x-auto pb-2">
+                  {localPreviews.map((preview, index) => (
+                    <div 
+                      key={preview.id} 
+                      className={`relative flex-none bg-zinc-100 border border-zinc-200 overflow-hidden group select-none ${
+                        bannerCategory === 'login' ? 'w-48 aspect-[3/2]' : 'w-52 aspect-[1920/650]'
+                      }`}
+                    >
+                      <img 
+                        src={preview.previewUrl} 
+                        alt={`Preview ${index + 1}`} 
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          if ((e.currentTarget as any).dataset.error) return; (e.currentTarget as any).dataset.error = 'true';
+                          e.currentTarget.src = 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=1200&auto=format&fit=crop&q=80';
+                        }}
+                      />
+                      <div className="absolute bottom-1 left-1 bg-black/80 px-1.5 py-0.5 text-[8px] font-black text-white uppercase tracking-wider flex items-center gap-1.5">
+                        <span>#{index + 1}</span>
+                        {preview.width && preview.height && (
+                          <span className="font-mono text-[7px] text-zinc-300">
+                            {preview.width}×{preview.height}
+                          </span>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRemovePreview(preview.id);
+                        }}
+                        className="absolute top-1 right-1 w-5 h-5 bg-red-600 text-white flex items-center justify-center cursor-pointer"
+                        title="Remove"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* 2. Banner Details */}
+        <div className="bg-white border border-zinc-200 rounded-none p-4 md:p-6 space-y-4 shadow-xs">
+          <div className="border-b border-zinc-100 pb-3">
+            <h3 className="text-xs font-black text-black uppercase tracking-wider">
+              2. Banner Information & Link Target <span className="text-zinc-400 font-bold">(Optional)</span>
+            </h3>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-800 mb-1">
+                Banner Name / Title
+              </label>
+              <input 
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder={bannerCategory === 'login' ? 'e.g. Account Welcome Banner' : (bannerCategory === 'category' ? 'e.g. ELECTRONICS SUPER SALE' : 'e.g. SUMMER APPARELS 50% FLAT')}
+                className="w-full px-3 py-2.5 bg-zinc-50 border border-zinc-200 focus:outline-none focus:border-black font-bold text-xs uppercase text-black"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-800 mb-1">
+                Subtitle / Promo Catchphrase
+              </label>
+              <input 
+                type="text"
+                value={offerText}
+                onChange={(e) => setOfferText(e.target.value)}
+                placeholder="e.g. SPECIAL OFFER"
+                className="w-full px-3 py-2.5 bg-zinc-50 border border-zinc-200 focus:outline-none focus:border-black font-bold text-xs uppercase text-black"
+              />
+            </div>
+          </div>
+
+          {bannerCategory !== 'login' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+              <div>
+                <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-800 mb-1">
+                  Connect Specific Product (Optional)
+                </label>
+                <ProductSearchDropdown 
+                  products={products}
+                  value={connectedProductId}
+                  onChange={(val) => {
+                    setConnectedProductId(val);
+                    setIsDirty(true);
+                  }}
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-800 mb-1">
+                  Direct Target Link / Route (Optional)
+                </label>
+                <input 
+                  type="text"
+                  value={buttonLink}
+                  onChange={(e) => setButtonLink(e.target.value)}
+                  placeholder={bannerCategory === 'category' ? '/category/electronics' : 'e.g. /category/electronics or /offers'}
+                  className="w-full px-3 py-2.5 bg-zinc-50 border border-zinc-200 focus:outline-none focus:border-black font-mono text-xs text-black"
+                />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* SECTION 3: ACCOUNT PROFILE CHARACTERS (Login Banner Only) */}
+        {bannerCategory === 'login' && (
+          <div className="bg-white border border-zinc-200 rounded-none p-4 md:p-6 space-y-4 shadow-xs">
+            <div className="border-b border-zinc-100 pb-3">
+              <h3 className="text-xs font-black text-black uppercase tracking-wider">
+                ACCOUNT PROFILE CHARACTERS
+              </h3>
+              <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider mt-0.5">
+                Default fallback avatars for Male, Female, and Guest customer profiles (Saved directly to Account Character Settings; not included in Banner Listing)
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              
+              {/* Slot 1: Male */}
+              <div className="border border-zinc-200 p-3 bg-zinc-50/50 flex flex-col justify-between space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="relative w-12 h-12 rounded-full overflow-hidden border border-zinc-300 bg-white shrink-0">
+                    <img 
+                      src={maleImage} 
+                      alt="Male Character" 
+                      className="w-full h-full object-cover rounded-full"
+                      referrerPolicy="no-referrer"
+                    />
+                    {characterUploadingSlot === 'male' && (
+                      <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-white">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-black uppercase text-black leading-none">Male Character</h4>
+                    <span className="text-[9px] font-bold text-emerald-600 uppercase tracking-wider mt-1 block">● Active Setting</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 pt-1 border-t border-zinc-100">
+                  <button
+                    type="button"
+                    onClick={() => handleCharacterSlotClick('male')}
+                    className="flex-1 py-1.5 bg-black text-white text-[9px] font-black uppercase tracking-wider hover:bg-neutral-800 cursor-pointer"
+                  >
+                    Upload / Change
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleResetCharacterSlot('male')}
+                    className="px-2 py-1.5 bg-zinc-200 text-neutral-700 text-[9px] font-black uppercase hover:bg-zinc-300 cursor-pointer"
+                    title="Reset to default"
+                  >
+                    Reset
+                  </button>
+                </div>
+              </div>
+
+              {/* Slot 2: Female */}
+              <div className="border border-zinc-200 p-3 bg-zinc-50/50 flex flex-col justify-between space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="relative w-12 h-12 rounded-full overflow-hidden border border-zinc-300 bg-white shrink-0">
+                    <img 
+                      src={femaleImage} 
+                      alt="Female Character" 
+                      className="w-full h-full object-cover rounded-full"
+                      referrerPolicy="no-referrer"
+                    />
+                    {characterUploadingSlot === 'female' && (
+                      <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-white">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-black uppercase text-black leading-none">Female Character</h4>
+                    <span className="text-[9px] font-bold text-emerald-600 uppercase tracking-wider mt-1 block">● Active Setting</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 pt-1 border-t border-zinc-100">
+                  <button
+                    type="button"
+                    onClick={() => handleCharacterSlotClick('female')}
+                    className="flex-1 py-1.5 bg-black text-white text-[9px] font-black uppercase tracking-wider hover:bg-neutral-800 cursor-pointer"
+                  >
+                    Upload / Change
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleResetCharacterSlot('female')}
+                    className="px-2 py-1.5 bg-zinc-200 text-neutral-700 text-[9px] font-black uppercase hover:bg-zinc-300 cursor-pointer"
+                    title="Reset to default"
+                  >
+                    Reset
+                  </button>
+                </div>
+              </div>
+
+              {/* Slot 3: Guest */}
+              <div className="border border-zinc-200 p-3 bg-zinc-50/50 flex flex-col justify-between space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="relative w-12 h-12 rounded-full overflow-hidden border border-zinc-300 bg-white shrink-0">
+                    <img 
+                      src={guestImage} 
+                      alt="Guest Character" 
+                      className="w-full h-full object-cover rounded-full"
+                      referrerPolicy="no-referrer"
+                    />
+                    {characterUploadingSlot === 'guest' && (
+                      <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-white">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-black uppercase text-black leading-none">Guest Character</h4>
+                    <span className="text-[9px] font-bold text-emerald-600 uppercase tracking-wider mt-1 block">● Active Setting</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 pt-1 border-t border-zinc-100">
+                  <button
+                    type="button"
+                    onClick={() => handleCharacterSlotClick('guest')}
+                    className="flex-1 py-1.5 bg-black text-white text-[9px] font-black uppercase tracking-wider hover:bg-neutral-800 cursor-pointer"
+                  >
+                    Upload / Change
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleResetCharacterSlot('guest')}
+                    className="px-2 py-1.5 bg-zinc-200 text-neutral-700 text-[9px] font-black uppercase hover:bg-zinc-300 cursor-pointer"
+                    title="Reset to default"
+                  >
+                    Reset
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Bottom Save / Action Bar */}
+        <div className="flex flex-col gap-3 pt-2">
+          <div className="flex items-center justify-end gap-3">
+            <button
+              type="button"
+              onClick={() => navigate('/admin/banner/list')}
+              className="px-5 py-3 border border-zinc-200 text-neutral-700 text-xs font-black uppercase tracking-wider hover:bg-zinc-50 cursor-pointer"
+              disabled={saveStatus === 'saving'}
+            >
+              Cancel
+            </button>
+            
+            <button
+              type="button"
+              onClick={() => handleSubmit()}
+              className={cn(
+                "px-6 py-3 text-xs font-black uppercase tracking-widest flex items-center gap-2 cursor-pointer shadow-xs border transition-all min-w-[200px] justify-center",
+                saveStatus === 'saving' ? "bg-zinc-800 text-white border-zinc-800 cursor-not-allowed" :
+                saveStatus === 'saved' ? "bg-emerald-600 text-white border-emerald-600" :
+                saveStatus === 'failed' ? "bg-red-600 text-white border-red-600" :
+                "bg-black hover:bg-neutral-900 border-black text-white"
+              )}
+              disabled={saveStatus === 'saving'}
+            >
+              {saveStatus === 'saving' ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>SAVING...</span>
+                </>
+              ) : (
+                <>
+                  {saveStatus === 'saved' ? 'SAVED SUCCESSFULLY' :
+                   saveStatus === 'failed' ? 'SAVE FAILED - RETRY' :
+                   `Save ${bannerCategory === 'login' ? 'Login Banner' : (bannerCategory === 'category' ? 'Category Banner' : 'Main Banner')} (${localPreviews.length})`}
+                </>
+              )}
+            </button>
+          </div>
+
+          <AnimatePresence>
+            {saveStatus === 'saving' && (
+              <motion.div 
+                initial={{ opacity: 0, y: 5 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                className="flex items-center justify-end gap-3"
+              >
+                <div className="flex items-center gap-3 p-3 bg-zinc-50 border border-zinc-200">
+                  <div className="w-4 h-4 border-2 border-black border-t-transparent animate-spin rounded-full shrink-0" />
+                  <span className="text-[10px] font-black uppercase tracking-widest text-black">
+                    {savingStep || 'Synchronizing with Hostinger...'}
+                  </span>
+                </div>
+              </motion.div>
+            )}
+
+            {saveStatus === 'failed' && saveError && (
+              <motion.div 
+                initial={{ opacity: 0, y: 5 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                className="flex justify-end"
+              >
+                <div className="p-3 bg-red-50 border border-red-200 text-red-600 flex items-start gap-3 max-w-md">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-black uppercase tracking-widest leading-none">Operation Failed</p>
+                    <p className="text-[10px] font-bold leading-relaxed">{saveError}</p>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+      </div>
+
+      <UnsavedChangesDialog
+        isOpen={showLeaveDialog}
+        title="Unsaved Changes"
+        message="আপনি এখনও ব্যানার তথ্য Save করেননি। আপনি কি নিশ্চিত এই পেজ থেকে বের হতে চান?"
+        onConfirm={handleConfirmLeave}
+        onCancel={handleCancelLeave}
+        cancelText="Cancel"
+        confirmText="Yes, Leave"
+      />
+    </div>
+  );
+}
+
+interface ProductSearchDropdownProps {
+  products: any[];
+  value: string;
+  onChange: (val: string) => void;
+}
+
+const ProductSearchDropdown: React.FC<ProductSearchDropdownProps> = ({ products, value, onChange }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const selectedProduct = products.find(p => p.id === value);
+
+  const filteredProducts = products.filter(p => 
+    p.name.toLowerCase().includes(query.toLowerCase()) || 
+    (p.sku && p.sku.toLowerCase().includes(query.toLowerCase()))
+  );
+
+  return (
+    <div className="relative" ref={containerRef}>
+      <div 
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full border border-zinc-200 px-3 py-2.5 rounded-none text-xs font-bold uppercase bg-zinc-50 cursor-pointer h-10 flex justify-between items-center transition-colors hover:border-black"
+      >
+        <span className="truncate pr-2">
+          {selectedProduct ? `${selectedProduct.name} (৳${selectedProduct.price})` : '-- Select Connected Product --'}
+        </span>
+        <div className="flex items-center gap-1">
+          {selectedProduct && (
+            <div 
+              onClick={(e) => {
+                e.stopPropagation();
+                onChange('');
+                setQuery('');
+              }}
+              className="p-1 hover:bg-zinc-200"
+              title="Clear"
+            >
+              <X className="w-3.5 h-3.5 text-zinc-500" />
+            </div>
+          )}
+          <span className="text-[10px] text-zinc-400">▼</span>
+        </div>
+      </div>
+
+      {isOpen && (
+        <div className="absolute bottom-full left-0 right-0 mb-1 bg-white border border-zinc-200 rounded-none shadow-lg z-50 overflow-hidden">
+          <div className="p-2 border-b border-zinc-100 flex items-center gap-2 bg-zinc-50">
+            <Search className="w-4 h-4 text-zinc-400" />
+            <input 
+              type="text"
+              autoFocus
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search product by name or SKU..."
+              className="w-full bg-transparent text-xs outline-none uppercase font-bold"
+            />
+          </div>
+          <div className="max-h-52 overflow-y-auto">
+            {filteredProducts.length > 0 ? (
+              filteredProducts.map(p => (
+                <div 
+                  key={p.id}
+                  onClick={() => {
+                    onChange(p.id);
+                    setIsOpen(false);
+                    setQuery('');
+                  }}
+                  className={`p-2.5 text-xs cursor-pointer hover:bg-zinc-100 transition-colors uppercase font-bold flex items-center justify-between ${
+                    value === p.id ? 'bg-zinc-100 border-l-2 border-black' : ''
+                  }`}
+                >
+                  <span className="truncate pr-4">{p.name}</span>
+                  <span className="text-emerald-600 font-black">৳{p.price}</span>
+                </div>
+              ))
+            ) : (
+              <div className="p-3 text-center text-xs text-zinc-500 uppercase font-bold">
+                No Products Found
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};

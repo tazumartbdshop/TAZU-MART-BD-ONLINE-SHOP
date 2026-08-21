@@ -1,0 +1,19 @@
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # 1. Reverse Proxy for /api/ routes to local Node.js backend if mod_proxy is available
+  <IfModule mod_proxy.c>
+    RewriteRule ^api/(.*)$ http://127.0.0.1:3000/api/$1 [P,L]
+  </IfModule>
+
+  # 2. DO NOT rewrite /api/ requests to index.html (return 404/pass through)
+  RewriteCond %{REQUEST_URI} ^/api/ [NC]
+  RewriteRule ^api/ - [L]
+
+  # 3. Standard Single Page Application rewrite for Frontend HTML routes
+  RewriteRule ^index\.html$ - [L]
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule . /index.html [L]
+</IfModule>

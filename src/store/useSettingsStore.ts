@@ -1,0 +1,899 @@
+import { create } from 'zustand';
+import { getDb } from '../lib/db';
+import { objectToSnake, objectToCamel } from '../lib/dbUtils';
+import { useBrandingStore } from './useBrandingStore';
+import { broadcastSync } from '../lib/broadcastSync';
+
+export interface AppSettings {
+  // 1. Store Identity
+  storeName: string;
+  storeEmail: string;
+  contactNumber: string;
+  timezone: string;
+  websiteUrl: string;
+  storeSlug: string;
+  businessType: string;
+  storeTagline: string;
+  storeDescription?: string;
+
+  // 2. Branding
+  primaryColor: string;
+  secondaryColor: string;
+  footerContentColor: string;
+  footerHeadingColor: string;
+  footerMutedColor: string;
+  footerIconColor: string;
+  footerSmallTextColor?: string;
+  footerCopyrightColor?: string;
+  storeLogo?: string;
+  favicon?: string;
+  mobileSplash?: string;
+  invoiceLogo?: string;
+  packagingLogo?: string;
+
+  // 3. Business Address
+  businessName: string;
+  contactPerson: string;
+  houseBuilding: string;
+  roadStreet: string;
+  areaThana: string;
+  city: string;
+  division: string;
+  district: string;
+  zipCode: string;
+  country: string;
+  phone: string;
+  email: string;
+  googleMapLink: string;
+
+  // 4. Business Owner
+  ownerName: string;
+  ownerEmail: string;
+  ownerPhone: string;
+  nationalId: string;
+  ownerProfilePhoto?: string;
+
+  // 5. Customer Login Settings
+  customerRegistration: boolean;
+  otpLogin: boolean;
+  gmailLogin: boolean;
+  passwordLogin: boolean;
+  autoAccountCreate: boolean;
+
+  // 6. Order Settings
+  autoOrderId: boolean;
+  autoInvoice: boolean;
+  orderTracking: boolean;
+  deliveryStatus: boolean;
+  cancelOrder: boolean;
+  returnOrder: boolean;
+
+  // 7. Delivery & Shipping
+  defaultDeliveryCharge: number;
+  insideCityCharge: number;
+  outsideCityCharge: number;
+  expressDeliveryCharge: number;
+  estimatedDeliveryTime: string;
+
+  // 8. Payment Settings
+  codEnabled: boolean;
+  cardEnabled: boolean;
+  bkashEnabled: boolean;
+  nagadEnabled: boolean;
+  rocketEnabled: boolean;
+  bankTransferEnabled: boolean;
+  bkashNumber: string;
+  nagadNumber: string;
+  rocketNumber: string;
+  bankDetails: string;
+  paymentInstructions: string;
+
+  // Extended dynamic payment custom fields
+  codLogo?: string;
+  codName?: string;
+  codInstruction?: string;
+
+  bkashLogo?: string;
+  bkashName?: string;
+  bkashInstruction?: string;
+
+  nagadLogo?: string;
+  nagadName?: string;
+  nagadInstruction?: string;
+
+  rocketLogo?: string;
+  rocketName?: string;
+  rocketInstruction?: string;
+
+  cardLogo?: string;
+  cardName?: string;
+  cardNumber?: string;
+  cardGatewayLink?: string;
+  cardInstruction?: string;
+
+  // Personal vs Merchant payments active switches
+  paymentPersonalActive: boolean;
+  paymentMerchantActive: boolean;
+
+  // Merchant structures
+  merchantGateway?: 'bkash' | 'nagad' | 'rocket' | 'sslcommerz' | 'other';
+  merchantName?: string;
+  merchantNumber?: string;
+  merchantApiKey?: string;
+  merchantApiSecret?: string;
+  merchantUsername?: string;
+  merchantPassword?: string;
+  merchantStoreId?: string;
+  merchantCallbackUrl?: string;
+  merchantSuccessUrl?: string;
+  merchantCancelUrl?: string;
+
+  // 9. Email & Notifications
+  smtpSettings: string;
+  orderConfirmationEmail: boolean;
+  smsNotification: boolean;
+  pushNotification: boolean;
+  shippingUpdate: boolean;
+
+  // 10. Invoice Settings
+  invoicePrefix: string;
+  invoiceFooterText: string;
+  returnPolicy: string;
+  currencySymbol: string;
+  invoiceTheme: 'white-black' | 'dark' | 'minimal';
+  autoPrintOption: boolean;
+  watermarkLogo?: string;
+  customerSupportNumber: string;
+
+  // 11. SEO Settings
+  metaTitle: string;
+  metaDescription: string;
+  keywords: string;
+  openGraphImage?: string;
+  googleAnalyticsCode: string;
+  facebookPixelCode: string;
+  googleSearchConsoleCode?: string;
+
+  // 12. Social Media Settings
+  facebookUrl: string;
+  facebookEnabled: boolean;
+  facebookPageUrl: string;
+  facebookPageEnabled: boolean;
+  messengerUrl: string;
+  messengerEnabled: boolean;
+  whatsappNumber: string;
+  whatsappEnabled: boolean;
+  instagramUrl: string;
+  instagramEnabled: boolean;
+  youtubeUrl: string;
+  youtubeEnabled: boolean;
+  tiktokUrl: string;
+  tiktokEnabled: boolean;
+  telegramLink: string; // compatibility
+  telegramUrl: string;
+  telegramEnabled: boolean;
+  twitterUrl: string;
+  twitterEnabled: boolean;
+  linkedinUrl: string;
+  linkedinEnabled: boolean;
+
+  // 13. Security Settings
+  admin2fa: boolean;
+  loginDeviceHistory: boolean;
+  failedLoginProtection: boolean;
+  ipRestriction: boolean;
+  adminEmail?: string;
+  adminPassword?: string;
+
+  // 14. Website Appearance
+  darkModeToggle: boolean;
+  themeColor: string;
+  fontStyle: string;
+  mobileLayoutToggle: boolean;
+
+  // 15. Checkout Settings
+  guestCheckout: boolean;
+  gmailRequired: boolean;
+  phoneRequired: boolean;
+  addressRequired: boolean;
+  checkoutNote: boolean;
+
+  // 16. Customer Support
+  hotlineNumber: string;
+  liveChatEnable: boolean;
+  whatsappChatButton: boolean;
+  aiChatSupport: boolean;
+  supportEmail: string;
+
+  // 17. File & Media
+  maxUploadSize: string;
+  allowedFileTypes: string;
+  videoUploadEnable: boolean;
+  cloudStorageEnable: boolean;
+
+  // 18. Backup & System
+  autoBackup: boolean;
+  coin_rate_coin: number;
+  coin_rate_money: number;
+
+  // 19. Promotion & Offers
+  flashSaleEnabled: boolean;
+  flashSaleEndTime: string;
+  allowStackDiscount: boolean;
+  
+  // 20. Supabase Settings
+  dbUrl: string;
+  dbKey: string;
+}
+
+const defaultSettings: AppSettings = {
+  storeName: '',
+  storeEmail: '',
+  contactNumber: '',
+  timezone: '',
+  websiteUrl: '',
+  storeSlug: '',
+  businessType: '',
+  storeTagline: '',
+  storeDescription: '',
+
+  primaryColor: '#000000',
+  secondaryColor: '#666666',
+  footerContentColor: '#E5E5E5',
+  footerHeadingColor: '#FFFFFF',
+  footerMutedColor: '#B8B8B8',
+  footerIconColor: '#DADADA',
+  footerSmallTextColor: '#B8B8B8',
+  footerCopyrightColor: '#B8B8B8',
+
+  businessName: 'TAZU MART BD',
+  contactPerson: 'Admin',
+  houseBuilding: '39 কাজী ভবন',
+  roadStreet: '',
+  areaThana: '',
+  city: 'Dhaka',
+  division: 'Dhaka',
+  district: 'Dhaka',
+  zipCode: '1212',
+  country: 'Bangladesh',
+  phone: '+880 1711223344',
+  email: 'admin@tazumartbd.com',
+  googleMapLink: 'https://maps.google.com/?q=39+Kazi+Bhaban,Dhaka',
+
+  ownerName: 'Admin Owner',
+  ownerEmail: 'owner@tazumartbd.com',
+  ownerPhone: '+880 1711223344',
+  nationalId: '',
+
+  customerRegistration: true,
+  otpLogin: true,
+  gmailLogin: true,
+  passwordLogin: true,
+  autoAccountCreate: true,
+
+  autoOrderId: true,
+  autoInvoice: true,
+  orderTracking: true,
+  deliveryStatus: true,
+  cancelOrder: false,
+  returnOrder: false,
+
+  defaultDeliveryCharge: 60,
+  insideCityCharge: 60,
+  outsideCityCharge: 120,
+  expressDeliveryCharge: 150,
+  estimatedDeliveryTime: '2-3 Days',
+
+  codEnabled: true,
+  cardEnabled: false,
+  bkashEnabled: true,
+  nagadEnabled: true,
+  rocketEnabled: true,
+  bankTransferEnabled: false,
+  bkashNumber: '01711223344',
+  nagadNumber: '01811223344',
+  rocketNumber: '01911223344',
+  bankDetails: '',
+  paymentInstructions: 'Please send money and enter TXN ID',
+
+  codLogo: '',
+  codName: 'Cash on Delivery',
+  codInstruction: 'Pay with cash upon receiving your order at your doorstep.',
+
+  bkashLogo: '',
+  bkashName: 'bKash Personal',
+  bkashInstruction: 'Please Send Money to the bKash Personal number above. Enter your bKash wallet number and your transaction reference ID (TxnID) below to process.',
+
+  nagadLogo: '',
+  nagadName: 'Nagad Personal',
+  nagadInstruction: 'Please Send Money to the Nagad Personal number above. Enter your Nagad wallet number and your transaction reference ID (TxnID) below to process.',
+
+  rocketLogo: '',
+  rocketName: 'Rocket Personal',
+  rocketInstruction: 'Please Send Money to the Rocket Personal number above. Enter your Rocket wallet number and your transaction reference ID (TxnID) below to process.',
+
+  cardLogo: '',
+  cardName: 'Secure SSL Gateway',
+  cardNumber: 'Secure 256-Bit Sandbox Handshake',
+  cardGatewayLink: '',
+  cardInstruction: 'Please authorize card payment securely via our sandbox-integrated SSL connection gateway.',
+
+  paymentPersonalActive: true,
+  paymentMerchantActive: false,
+  merchantGateway: 'sslcommerz',
+  merchantName: 'bKash Merchant Pay',
+  merchantNumber: '01700990099',
+  merchantApiKey: 'bk_api_key_88abec97',
+  merchantApiSecret: 'bk_sec_9934bc76',
+  merchantUsername: 'tazumart_merchant',
+  merchantPassword: '••••••••',
+  merchantStoreId: 'tazum5019',
+  merchantCallbackUrl: 'https://ais-pre-bprxi4s6ojh56gigyoabm3-918145641738.asia-southeast1.run.app/api/payment/callback',
+  merchantSuccessUrl: 'https://tazumart.bd/checkout/success',
+  merchantCancelUrl: 'https://tazumart.bd/checkout/cancel',
+
+  smtpSettings: '',
+  orderConfirmationEmail: true,
+  smsNotification: true,
+  pushNotification: false,
+  shippingUpdate: true,
+
+  invoicePrefix: 'INV-',
+  invoiceFooterText: 'Thank you for shopping with us!',
+  returnPolicy: '7 days exchange available.',
+  currencySymbol: '৳',
+  invoiceTheme: 'white-black',
+  autoPrintOption: false,
+  customerSupportNumber: '+880 1711223344',
+
+  metaTitle: 'TAZU MART BD - Online Store',
+  metaDescription: 'Description here',
+  keywords: 'ecommerce, bangladesh, shopping',
+  googleAnalyticsCode: '',
+  facebookPixelCode: '',
+  googleSearchConsoleCode: '',
+
+  facebookUrl: 'https://facebook.com/tazumartbd',
+  facebookEnabled: true,
+  facebookPageUrl: 'https://facebook.com/tazumartbd.page',
+  facebookPageEnabled: true,
+  messengerUrl: 'https://m.me/tazumartbd',
+  messengerEnabled: true,
+  whatsappNumber: '+8801711223344',
+  whatsappEnabled: true,
+  instagramUrl: 'https://instagram.com/tazumartbd',
+  instagramEnabled: true,
+  youtubeUrl: 'https://youtube.com/tazumartbd/videos',
+  youtubeEnabled: false,
+  tiktokUrl: 'https://tiktok.com/@tazumartbd',
+  tiktokEnabled: false,
+  telegramLink: 'https://t.me/tazumartbd',
+  telegramUrl: 'https://t.me/tazumartbd',
+  telegramEnabled: true,
+  twitterUrl: 'https://twitter.com/tazumartbd',
+  twitterEnabled: false,
+  linkedinUrl: 'https://linkedin.com/company/tazumartbd',
+  linkedinEnabled: false,
+
+  admin2fa: false,
+  loginDeviceHistory: true,
+  failedLoginProtection: true,
+  ipRestriction: false,
+  adminEmail: 'admin.tazumartbd@gmail.com',
+  adminPassword: '8963885522',
+
+  darkModeToggle: false,
+  themeColor: '#000000',
+  fontStyle: 'Outfit',
+  mobileLayoutToggle: true,
+
+  guestCheckout: true,
+  gmailRequired: false,
+  phoneRequired: true,
+  addressRequired: true,
+  checkoutNote: true,
+
+  hotlineNumber: '+880 1711223344',
+  liveChatEnable: false,
+  whatsappChatButton: true,
+  aiChatSupport: false,
+  supportEmail: 'support@tazumartbd.com',
+
+  maxUploadSize: '5MB',
+  allowedFileTypes: 'PNG, JPG, PDF',
+  videoUploadEnable: false,
+  cloudStorageEnable: false,
+
+  autoBackup: true,
+  coin_rate_coin: 100,
+  coin_rate_money: 1,
+
+  flashSaleEnabled: true,
+  flashSaleEndTime: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+  allowStackDiscount: false,
+  
+  dbUrl: '',
+  dbKey: '',
+};
+
+interface SettingsState {
+  settings: AppSettings;
+  draftSettings: AppSettings;
+  isLoaded: boolean;
+  updateSettings: (updates: Partial<AppSettings>) => Promise<void>;
+  updateDraftSettings: (updates: Partial<AppSettings>) => void;
+  publishSettings: () => Promise<void>;
+  resetDraftSettings: () => void;
+  subscribe: () => () => void;
+  fetchLatestLogo: () => Promise<string | null>;
+}
+
+// Robust helper to write logo to site_settings with fallback schemas
+const saveLogoToSiteSettings = async (logoUrl: string) => {
+  const db = getDb();
+  if (!db || !logoUrl) return;
+
+  console.log("Upserting logo to site_settings table:", logoUrl);
+  const cleanUrl = logoUrl.split('?')[0];
+
+  try {
+    const dbPayload = objectToSnake({ 
+      id: 'logo', 
+      logoUrl: cleanUrl, 
+      logo: cleanUrl,
+      url: cleanUrl,
+      value: cleanUrl,
+      updatedAt: new Date().toISOString()
+    });
+    // Attempt 1: ID-column oriented row
+    const { error: err1 } = await db.from('site_settings').upsert([dbPayload]);
+    
+    if (err1) {
+      console.warn("site_settings upsert format 1 failed, trying format 2...", err1.message);
+      // Attempt 2: Key-value oriented row
+      const dbPayload2 = objectToSnake({ 
+        key: 'logo_url', 
+        value: cleanUrl,
+        logoUrl: cleanUrl,
+        updatedAt: new Date().toISOString()
+      });
+      const { error: err2 } = await db.from('site_settings').upsert([dbPayload2]);
+      
+      if (err2) {
+        console.warn("site_settings upsert format 2 failed, trying format 3...", err2.message);
+        // Attempt 3: Key-value alternative row
+        await db.from('site_settings').upsert([objectToSnake({ 
+          key: 'logo', 
+          value: cleanUrl, 
+          updatedAt: new Date().toISOString() 
+        })]);
+      }
+    }
+  } catch (e) {
+    console.warn("site_settings upsert caught error:", e);
+  }
+};
+
+const getInitialSettings = (): AppSettings => {
+  try {
+    const saved = localStorage.getItem('tazu_settings_cache');
+    if (saved) {
+      return { ...defaultSettings, ...JSON.parse(saved) };
+    }
+  } catch (e) {
+    console.warn("Could not read settings cache", e);
+  }
+  return defaultSettings;
+};
+
+export const useSettingsStore = create<SettingsState>((set, get) => ({
+  settings: getInitialSettings(),
+  draftSettings: getInitialSettings(),
+  isLoaded: (typeof window !== 'undefined' && !!(localStorage.getItem('tazu_settings_cache') || localStorage.getItem('db_cached_settings'))),
+  fetchLatestLogo: async () => {
+    const db = getDb();
+    if (!db) return null;
+    try {
+      const { data, error } = await db.from('site_settings').select('*');
+      if (error) {
+        console.warn("Could not query 'site_settings' table (may not exist or is loading):", error.message);
+        return null;
+      }
+      
+      if (data && data.length > 0) {
+        let foundUrl = '';
+        let updatedAt = '';
+        const keysToSearch = ['logo_url', 'logoUrl', 'value', 'url', 'storeLogo', 'logo'];
+        for (const row of data) {
+          const camelRow = objectToCamel(row);
+          for (const k of keysToSearch) {
+            if (camelRow[k] && typeof camelRow[k] === 'string' && camelRow[k].startsWith('http')) {
+              foundUrl = camelRow[k];
+              updatedAt = row.updated_at || camelRow.updatedAt || '';
+              break;
+            }
+          }
+          if (foundUrl) break;
+        }
+
+        if (foundUrl) {
+          const cleanUrl = foundUrl.split('?')[0];
+          // Use stable database updatedAt as a cache-buster instead of Date.now() to allow perfect browser caching
+          const cacheBuster = updatedAt ? `t=${encodeURIComponent(updatedAt)}` : 'v=1';
+          const bustedUrl = `${cleanUrl}?${cacheBuster}`;
+          
+          set((state) => ({
+            settings: { ...state.settings, storeLogo: bustedUrl },
+            draftSettings: { ...state.draftSettings, storeLogo: bustedUrl }
+          }));
+          return bustedUrl;
+        }
+      }
+    } catch (err) {
+      console.error("Error fetching logo from site_settings:", err);
+    }
+    return null;
+  },
+  updateSettings: async (updates) => {
+    const { settings } = get();
+    const newSettings = { ...settings, ...updates };
+
+    const db = getDb();
+    if (!db) {
+      throw new Error("Supabase is not initialized. Please connect your database first.");
+    }
+
+    // 1. Sync to store_identity table (Master Source of Truth)
+    const identityPayload = objectToSnake({
+      id: 'global',
+      store_name: newSettings.storeName,
+      store_slug: newSettings.storeSlug,
+      store_description: newSettings.storeDescription,
+      store_tagline: newSettings.storeTagline,
+      support_email: newSettings.supportEmail || newSettings.storeEmail,
+      contact_number: newSettings.contactNumber,
+      website_url: newSettings.websiteUrl,
+      timezone: newSettings.timezone,
+      industry: newSettings.businessType,
+      business_type: newSettings.businessType,
+      country: newSettings.country,
+      primary_logo: newSettings.storeLogo,
+      updated_at: new Date().toISOString()
+    });
+
+    const { error: identityError } = await db.from('store_identity').upsert([identityPayload]);
+    if (identityError) {
+      console.error("Supabase store_identity update fail:", identityError);
+      throw new Error(`[Database Table: store_identity] Save failed: ${identityError.message}. Please execute the schema script to add columns: store_tagline, country, business_type.`);
+    }
+
+    // 2. Double-check persistence by querying back the master record immediately
+    const { data: verifyData, error: verifyError } = await db
+      .from('store_identity')
+      .select('store_name, store_slug, store_tagline, country, business_type')
+      .eq('id', 'global')
+      .single();
+
+    if (verifyError || !verifyData) {
+      throw new Error(`Database verification failed: Could not read back the saved record from the 'store_identity' table. Details: ${verifyError?.message || 'Empty record'}`);
+    }
+
+    // 3. Update main settings table (as JSON in 'value' column to avoid schema issues)
+    const dbPayload = { 
+        id: 'global', 
+        value: JSON.stringify(objectToSnake(newSettings)),
+        updated_at: new Date().toISOString()
+    };
+    const { error: settingsError } = await db.from('settings').upsert([dbPayload]);
+    if (settingsError && settingsError.code !== '42P01') {
+      console.error("Supabase settings update fail:", settingsError);
+    }
+    
+    // 4. Update the local states only after DB confirmation and verification
+    set({ settings: newSettings, draftSettings: newSettings });
+    try { localStorage.setItem('tazu_settings_cache', JSON.stringify(newSettings)); } catch(e) {}
+    broadcastSync.publish('settings', newSettings);
+    
+    // 5. Propagate to branding if logo changed
+    if (updates.storeLogo) {
+      await saveLogoToSiteSettings(updates.storeLogo);
+      
+      const logoUrl = updates.storeLogo;
+      const brandingUpdates = {
+        primary_logo: logoUrl,
+        secondary_logo: logoUrl,
+        favicon: logoUrl,
+        apple_touch_icon: logoUrl,
+        mobile_logo: logoUrl,
+        desktop_logo: logoUrl,
+        dark_logo: logoUrl,
+        light_logo: logoUrl,
+        footer_logo: logoUrl,
+        invoice_logo: logoUrl,
+        email_logo: logoUrl,
+        loading_logo: logoUrl,
+        watermark_logo: logoUrl,
+        share_logo: logoUrl,
+        login_logo: logoUrl,
+        signup_logo: logoUrl,
+        updated_at: new Date().toISOString()
+      };
+      
+      const { error: brandingError } = await db.from('branding_settings').upsert([{ id: 'global', ...brandingUpdates }]);
+      if (brandingError) {
+        console.warn("Failed to update branding_settings:", brandingError.message);
+      }
+      useBrandingStore.getState().fetchBranding();
+
+      // Sync companion Flutter app config logo and name if available
+      try {
+        const { data: flutterData } = await db.from('settings').select('*').eq('id', 'flutter_config').single();
+        if (flutterData && flutterData.config) {
+          const config = flutterData.config;
+          let changed = false;
+          if (updates.storeLogo && config.brand.logoUrl !== updates.storeLogo) {
+            config.brand.logoUrl = updates.storeLogo;
+            changed = true;
+          }
+          if (updates.storeName && config.brand.name !== updates.storeName) {
+            config.brand.name = updates.storeName;
+            changed = true;
+          }
+          if (updates.contactNumber && config.contact) {
+            if (config.contact.phone !== updates.contactNumber) {
+              config.contact.phone = updates.contactNumber;
+              changed = true;
+            }
+            const cleanNum = updates.contactNumber.replace(/[^0-9]/g, '');
+            const waLink = `https://wa.me/${cleanNum}`;
+            if (config.socialLinks && Array.isArray(config.socialLinks)) {
+              const waIdx = config.socialLinks.findIndex((l: any) => l.platform === 'WhatsApp');
+              if (waIdx !== -1 && config.socialLinks[waIdx].url !== waLink) {
+                config.socialLinks[waIdx].url = waLink;
+                changed = true;
+              }
+            }
+          }
+          if (changed) {
+            await db.from('settings').upsert([{ id: 'flutter_config', config }]);
+          }
+        }
+      } catch (fErr) {
+        console.warn("Could not sync details to flutter_config during saveSettings:", fErr);
+      }
+    }
+  },
+  updateDraftSettings: (updates) => {
+    set((state) => ({ draftSettings: { ...state.draftSettings, ...updates } }));
+  },
+  publishSettings: async () => {
+    try {
+      const draft = get().draftSettings;
+
+      const db = getDb();
+      if (!db) {
+        throw new Error("Supabase is not initialized.");
+      }
+
+      // 1. Sync to store_identity table
+      const identityPayload = objectToSnake({
+        id: 'global',
+        store_name: draft.storeName,
+        store_slug: draft.storeSlug,
+        store_description: draft.storeDescription,
+        store_tagline: draft.storeTagline,
+        support_email: draft.supportEmail || draft.storeEmail,
+        contact_number: draft.contactNumber,
+        website_url: draft.websiteUrl,
+        timezone: draft.timezone,
+        industry: draft.businessType,
+        business_type: draft.businessType,
+        country: draft.country,
+        primary_logo: draft.storeLogo,
+        updated_at: new Date().toISOString()
+      });
+      const { error: identityError } = await db.from('store_identity').upsert([identityPayload]);
+      if (identityError) {
+        throw new Error(`[Database Table: store_identity] Publish failed: ${identityError.message}`);
+      }
+
+      // 2. Update settings table
+      const dbPayload = { 
+        id: 'global', 
+        value: JSON.stringify(objectToSnake(draft)),
+        updated_at: new Date().toISOString()
+      };
+      const { error: settingsError } = await db.from('settings').upsert([dbPayload]);
+      if (settingsError && settingsError.code !== '42P01') throw settingsError;
+      
+      // 2.5. Verification Check: Confirm records were actually stored and can be queried back from Hostinger MySQL
+      const { data: verifyId, error: verifyIdErr } = await db
+        .from('store_identity')
+        .select('store_name')
+        .eq('id', 'global')
+        .maybeSingle();
+
+      if (verifyIdErr || !verifyId) {
+        throw new Error(`MySQL Verification Failed: Saved record could not be found or verified in 'store_identity' table. Details: ${verifyIdErr?.message || 'Empty database row returned.'}`);
+      }
+
+      const { data: verifySet, error: verifySetErr } = await db
+        .from('settings')
+        .select('id')
+        .eq('id', 'global')
+        .maybeSingle();
+
+      if (verifySetErr || !verifySet) {
+        throw new Error(`MySQL Verification Failed: Saved record could not be found or verified in 'settings' table. Details: ${verifySetErr?.message || 'Empty database row returned.'}`);
+      }
+      
+      // 3. Branding propagation
+      if (draft.storeLogo) {
+        await saveLogoToSiteSettings(draft.storeLogo);
+        const logoUrl = draft.storeLogo;
+        const brandingUpdates = {
+          primary_logo: logoUrl,
+          secondary_logo: logoUrl,
+          favicon: logoUrl,
+          apple_touch_icon: logoUrl,
+          mobile_logo: logoUrl,
+          desktop_logo: logoUrl,
+          dark_logo: logoUrl,
+          light_logo: logoUrl,
+          footer_logo: logoUrl,
+          invoice_logo: logoUrl,
+          email_logo: logoUrl,
+          loading_logo: logoUrl,
+          watermark_logo: logoUrl,
+          share_logo: logoUrl,
+          login_logo: logoUrl,
+          signup_logo: logoUrl,
+          updated_at: new Date().toISOString()
+        };
+        await db.from('branding_settings').upsert([{ id: 'global', ...brandingUpdates }]);
+        useBrandingStore.getState().fetchBranding();
+
+        // Sync companion Flutter app config logo and name if available
+        try {
+          const { data: flutterData } = await db.from('settings').select('*').eq('id', 'flutter_config').single();
+          if (flutterData && flutterData.config) {
+            const config = flutterData.config;
+            let changed = false;
+            if (draft.storeLogo && config.brand.logoUrl !== draft.storeLogo) {
+              config.brand.logoUrl = draft.storeLogo;
+              changed = true;
+            }
+            if (draft.storeName && config.brand.name !== draft.storeName) {
+              config.brand.name = draft.storeName;
+              changed = true;
+            }
+            if (draft.contactNumber && config.contact) {
+              if (config.contact.phone !== draft.contactNumber) {
+                config.contact.phone = draft.contactNumber;
+                changed = true;
+              }
+              const cleanNum = draft.contactNumber.replace(/[^0-9]/g, '');
+              const waLink = `https://wa.me/${cleanNum}`;
+              if (config.socialLinks && Array.isArray(config.socialLinks)) {
+                const waIdx = config.socialLinks.findIndex((l: any) => l.platform === 'WhatsApp');
+                if (waIdx !== -1 && config.socialLinks[waIdx].url !== waLink) {
+                  config.socialLinks[waIdx].url = waLink;
+                  changed = true;
+                }
+              }
+            }
+            if (changed) {
+              await db.from('settings').upsert([{ id: 'flutter_config', config }]);
+            }
+          }
+        } catch (fErr) {
+          console.warn("Could not sync details to flutter_config during publishSettings:", fErr);
+        }
+      }
+
+      set({ settings: draft });
+      try { localStorage.setItem('tazu_settings_cache', JSON.stringify(draft)); } catch(e) {}
+      broadcastSync.publish('settings', draft);
+      console.log("Settings published to Supabase");
+    } catch (error) {
+      console.error("Supabase publishSettings error:", error);
+      throw error;
+    }
+  },
+  resetDraftSettings: () => set((state) => ({ draftSettings: state.settings })),
+  subscribe: () => {
+    const db = getDb();
+    
+    // Always fall back to local if no db
+    if (!db) {
+        set({ settings: defaultSettings, draftSettings: defaultSettings, isLoaded: true });
+        return () => {};
+    }
+    
+    // Load setting collections
+    const loadData = async () => {
+      const db = getDb();
+      if (!db) return;
+
+      // 1. Load from main settings
+      const { data: settingsData, error: settingsError } = await db.from('settings').select('*').eq('id', 'global').limit(1);
+      
+      // 2. Load from store_identity (Priority Source of Truth for identity fields)
+      const { data: identityData, error: identityError } = await db.from('store_identity').select('*').eq('id', 'global').limit(1);
+
+      let mergedSettings = { ...defaultSettings };
+
+      if (!settingsError && settingsData && settingsData.length > 0) {
+          const row = settingsData[0];
+          // Support both flat columns and JSON wrapper
+          if (row.value) {
+            try {
+              const parsedValue = typeof row.value === 'string' ? JSON.parse(row.value) : row.value;
+              mergedSettings = { ...mergedSettings, ...objectToCamel(parsedValue) };
+            } catch (e) {
+              mergedSettings = { ...mergedSettings, ...objectToCamel(row) };
+            }
+          } else {
+            mergedSettings = { ...mergedSettings, ...objectToCamel(row) };
+          }
+      }
+
+      if (!identityError && identityData && identityData.length > 0) {
+          const idData = objectToCamel(identityData[0]);
+          mergedSettings = {
+            ...mergedSettings,
+            storeName: idData.storeName || mergedSettings.storeName,
+            storeSlug: idData.storeSlug || mergedSettings.storeSlug,
+            storeDescription: idData.storeDescription || mergedSettings.storeDescription,
+            storeTagline: idData.storeTagline || mergedSettings.storeTagline,
+            country: idData.country || mergedSettings.country,
+            supportEmail: idData.supportEmail || idData.storeEmail || mergedSettings.supportEmail,
+            contactNumber: idData.contactNumber || mergedSettings.contactNumber,
+            websiteUrl: idData.websiteUrl || mergedSettings.websiteUrl,
+            timezone: idData.timezone || mergedSettings.timezone,
+            businessType: idData.businessType || idData.industry || mergedSettings.businessType,
+            storeLogo: idData.primaryLogo || idData.storeLogo || mergedSettings.storeLogo
+          };
+      }
+
+      set({ settings: mergedSettings, draftSettings: mergedSettings, isLoaded: true });
+      try { localStorage.setItem('tazu_settings_cache', JSON.stringify(mergedSettings)); } catch(e) {}
+      broadcastSync.publish('settings', mergedSettings);
+      get().fetchLatestLogo();
+    };
+
+    if (!get().isLoaded) {
+      loadData();
+    }
+
+    const channel = db
+      .channel('public:settings:' + Math.random().toString(36).substring(2, 9))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, (payload) => {
+        loadData();
+      })
+      .subscribe();
+
+    // Setup listener on store_identity
+    const channelIdentity = db
+      .channel('public:store_identity:' + Math.random().toString(36).substring(2, 9))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'store_identity' }, (payload) => {
+        loadData();
+      })
+      .subscribe();
+      
+    // Setup listener on specialized site_settings table as well
+    const channelLogo = db
+      .channel('public:site_settings:' + Math.random().toString(36).substring(2, 9))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'site_settings' }, (payload) => {
+        console.log("Real-time site_settings update received!");
+        get().fetchLatestLogo();
+      })
+      .subscribe();
+      
+    return () => {
+        db.removeChannel(channel);
+        db.removeChannel(channelLogo);
+        db.removeChannel(channelIdentity);
+    }
+  }
+}));

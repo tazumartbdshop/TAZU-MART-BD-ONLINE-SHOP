@@ -1,0 +1,325 @@
+import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
+import { useCategoryStore } from '../../store/useCategoryStore';
+import { useProductStore } from '../../store/useProductStore';
+import { getDb } from '../../lib/db';
+import { Database, ShieldAlert, CheckCircle2, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
+
+export function RuntimeDiagnostics() {
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const isDebugActive = searchParams.get('debug') === 'true' || searchParams.get('debug') === '1';
+
+  const [isOpen, setIsOpen] = useState(false);
+  const { categories, isLoaded: categoriesLoaded } = useCategoryStore();
+  const { products, isLoading: productsLoading } = useProductStore();
+
+  const [dbStatus, setSupabaseStatus] = useState<'connected' | 'error' | 'disconnected'>('disconnected');
+  const [dbUrlUsed, setSupabaseUrlUsed] = useState<string>('');
+  const [activeSource, setActiveSource] = useState<string>('');
+
+  useEffect(() => {
+    if (!isDebugActive) return;
+
+    let active = true;
+
+    const testSupabaseConnection = async () => {
+      const client = getDb();
+      if (!client) {
+        if (active) {
+          setSupabaseStatus('disconnected');
+          setSupabaseUrlUsed('None (Client empty)');
+          setActiveSource('No credentials found in window/env');
+        }
+        return;
+      }
+
+      // Read active configuration
+      const winUrl = (window as any).__SUPABASE_URL || (window as any).__db_url;
+      const envUrl = import.meta.env.VITE_SUPABASE_URL || '';
+      
+      const configSnapshot = {
+        windowUrl: (window as any).__SUPABASE_URL || 'missing',
+        windowKey: (window as any).__SUPABASE_KEY ? 'present' : 'missing',
+        lowerUrl: (window as any).__db_url || 'missing',
+        lowerKey: (window as any).__db_key ? 'present' : 'missing',
+        envUrl: import.meta.env.VITE_SUPABASE_URL || 'missing',
+        envKey: import.meta.env.VITE_SUPABASE_ANON_KEY ? 'present' : 'missing'
+      };
+
+      if (winUrl) {
+        if (active) {
+          setSupabaseUrlUsed(winUrl);
+          setActiveSource('Dynamic (Injected / fetched from API)');
+        }
+      } else if (envUrl) {
+        if (active) {
+          setSupabaseUrlUsed(envUrl);
+          setActiveSource('Build-time (Vite .env compilation)');
+        }
+      } else {
+        if (active) {
+          setSupabaseUrlUsed('Unknown');
+          setActiveSource('Fallback');
+        }
+      }
+
+      console.group("[Runtime Diagnostics] Supabase Configuration Audit");
+      console.table(configSnapshot);
+      console.groupEnd();
+
+      try {
+        const startTime = performance.now();
+        const { data, error, status, statusText } = await client.from('categories').select('*').limit(50);
+        const endTime = performance.now();
+
+        console.log(`%c[Supabase API Snapshot] Response Status: ${status} ${statusText} in ${(endTime - startTime).toFixed(2)}ms`, "background: #111; color: #10b981; padding: 4px; font-weight: bold;");
+        
+        if (!active) return;
+
+        if (error) {
+          console.error("[Supabase API Snapshot] Fetch Error:", error);
+          setSupabaseStatus('error');
+        } else {
+          console.log("[Supabase API Snapshot] Data Payload:", data);
+          setSupabaseStatus('connected');
+        }
+      } catch (err) {
+        console.error("[Runtime Diagnostics] Fatal connection test failure:", err);
+        if (active) setSupabaseStatus('error');
+      }
+    };
+
+    testSupabaseConnection();
+
+    // Small polling safeguard for late initialization
+    const intervalId = setInterval(() => {
+      if (getDb() && dbStatus === 'disconnected') {
+        testSupabaseConnection();
+      }
+    }, 1500);
+
+    return () => {
+      active = false;
+      clearInterval(intervalId);
+    };
+  }, [isDebugActive, categories, categoriesLoaded]);
+
+  if (!isDebugActive) return null;
+
+  // Build diagnostics list of categories to see why they passed or failed the filters
+  const categoryDetails = categories.map(c => {
+    const statusStr = String(c.status || 'Active').toLowerCase();
+    const isActive = statusStr === 'active';
+    
+    const showOnHome = c.showOnHomepage !== false && (c as any).show_on_homepage !== false;
+    const isVisible = (c as any).is_visible !== false && (c as any).isVisible !== false;
+    const isPublished = (c as any).published !== false;
+    
+    const passedHome = isActive && showOnHome && isVisible && isPublished;
+    const passedPage = isActive && isVisible && isPublished;
+
+    const reasons: string[] = [];
+    if (!isActive) reasons.push(`status="${c.status}" (expected "Active")`);
+    if (!showOnHome) reasons.push(`showOnHomepage=${c.showOnHomepage} (expected true)`);
+    if (!isVisible) reasons.push(`is_visible=false`);
+    if (!isPublished) reasons.push(`published=false`);
+
+    return {
+      id: c.id,
+      name: c.name,
+      slug: c.slug,
+      displayOrder: c.displayOrder,
+      passedHome,
+      passedPage,
+      reasons: reasons.join(', ')
+    };
+  });
+
+  return (
+    <div className="fixed bottom-6 right-6 z-[99999] font-mono leading-relaxed" id="runtime-diagnostics-container">
+      {/* Setup Required Announcement for Live Domain */}
+      {dbStatus === 'disconnected' && !isOpen && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 w-full max-w-lg animate-in fade-in slide-in-from-top-4 duration-700 px-4">
+          <div className="bg-red-600 text-white rounded-xl shadow-2xl p-4 border-2 border-white/20 flex flex-col gap-2">
+            <div className="flex items-center gap-2">
+              <ShieldAlert className="w-5 h-5 text-white animate-pulse" />
+              <span className="font-sans font-black text-sm uppercase tracking-tighter italic">Supabase Connection Required</span>
+            </div>
+            <p className="text-white/90 text-[11px] font-sans font-medium">
+              The live website is currently disconnected from your database. Categories and Products won't show up until you add your credentials to the project environment.
+            </p>
+            <div className="flex gap-2 mt-1">
+              <button 
+                onClick={() => setIsOpen(true)}
+                className="bg-white text-red-600 px-3 py-1.5 rounded-lg font-black text-[10px] uppercase tracking-wider hover:bg-neutral-100 transition-colors shadow-sm"
+              >
+                Show Steps
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mini floating toggle badge */}
+      {!isOpen && (
+        <button
+          onClick={() => setIsOpen(true)}
+          className="flex items-center gap-2 bg-neutral-900 border border-neutral-700 text-white px-4 py-2.5 rounded-full shadow-2xl hover:bg-neutral-800 transition-all font-sans text-xs font-black uppercase tracking-wider animate-bounce"
+        >
+          <Database className="w-4 h-4 text-emerald-400" />
+          🔧 DB-DEBUG
+        </button>
+      )}
+
+      {/* Main expanded panel */}
+      {isOpen && (
+        <div className="bg-neutral-950 border border-neutral-800 text-neutral-200 w-[550px] max-w-[95vw] h-[600px] max-h-[85vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+          {/* Header */}
+          <div className="bg-neutral-900 px-5 py-4 border-b border-neutral-800 flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <Database className="w-5 h-5 text-emerald-400" />
+              <span className="font-sans font-black text-xs uppercase tracking-widest text-white">Production Diagnostics Panel</span>
+            </div>
+            <button
+              onClick={() => setIsOpen(false)}
+              className="text-neutral-400 hover:text-white text-xs font-bold font-sans uppercase tracking-widest bg-neutral-800 px-2.5 py-1.5 rounded-lg transition-colors border border-neutral-700"
+            >
+              Hide
+            </button>
+          </div>
+
+          {/* Panel Scroll Content */}
+          <div className="flex-1 p-5 overflow-y-auto space-y-6 text-xs">
+            {/* Supabase Status Summary */}
+            <div className="bg-neutral-900/60 p-4 rounded-xl border border-neutral-800/80 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-neutral-400 font-bold uppercase tracking-wider text-[10px]">Client Status</span>
+                {dbStatus === 'connected' ? (
+                  <span className="flex items-center gap-1.5 text-emerald-400 font-bold bg-emerald-950/40 border border-emerald-900 px-2 py-0.5 rounded-full text-[10px] uppercase">
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Connected
+                  </span>
+                ) : dbStatus === 'error' ? (
+                  <span className="flex items-center gap-1.5 text-red-400 font-bold bg-red-950/40 border border-red-900 px-2 py-0.5 rounded-full text-[10px] uppercase">
+                    <ShieldAlert className="w-3.5 h-3.5" /> Query Error
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1.5 text-amber-400 font-bold bg-amber-950/40 border border-amber-900 px-2 py-0.5 rounded-full text-[10px] uppercase">
+                    <ShieldAlert className="w-3.5 h-3.5" /> Unconfigured
+                  </span>
+                )}
+              </div>
+
+              <div className="space-y-1.5 pt-1.5 border-t border-neutral-800/50">
+                <div className="flex justify-between">
+                  <span className="text-neutral-400 font-sans">Active URL:</span>
+                  <span className="text-white break-all text-right font-semibold select-all font-mono max-w-[280px]">
+                    {dbUrlUsed || 'Empty'}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-neutral-400 font-sans">Config Source:</span>
+                  <span className="text-sky-400 font-semibold">{activeSource}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Actions / Status Check */}
+            {dbStatus === 'disconnected' && (
+              <div className="bg-amber-950/20 border border-amber-900/50 p-4 rounded-xl space-y-2 leading-relaxed">
+                <div className="font-bold text-amber-400 uppercase tracking-widest text-[10px] flex items-center gap-1">
+                  <ShieldAlert className="w-4 h-4" /> Action Required: Missing Production Keys
+                </div>
+                <p className="text-neutral-300 font-sans">
+                  The Supabase client is empty. Since Vercel serves the application statically, the server API cannot inject keys at runtime. You must add them to Vercel:
+                </p>
+                <ol className="list-decimal pl-4 space-y-1 text-[11px] font-sans text-neutral-300">
+                  <li>Go to your <strong className="text-white">Vercel Dashboard</strong> &rarr; <strong className="text-white">Project Settings</strong> &rarr; <strong className="text-white">Environment Variables</strong>.</li>
+                  <li>Add <strong className="text-white">VITE_SUPABASE_URL</strong> and <strong className="text-white">VITE_SUPABASE_ANON_KEY</strong>.</li>
+                  <li><strong className="text-emerald-400">CRITICAL STEP:</strong> Trigger a <strong className="text-white">New Deployment</strong> in Vercel. Vite env constants are baked in during compilation—they do NOT apply to existing builds.</li>
+                </ol>
+              </div>
+            )}
+
+            {/* Counts */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-neutral-900/40 p-3.5 rounded-xl border border-neutral-800 text-center">
+                <div className="text-neutral-400 font-sans uppercase tracking-widest text-[9px] mb-1">Categories in Store</div>
+                <div className="text-2xl font-black text-white">{categoriesLoaded ? categories.length : 'Loading...'}</div>
+                <div className="text-[9px] text-neutral-500 font-sans font-semibold mt-1">
+                  Active (Homepage): {categoryDetails.filter(c => c.passedHome).length}
+                </div>
+              </div>
+              <div className="bg-neutral-900/40 p-3.5 rounded-xl border border-neutral-800 text-center">
+                <div className="text-neutral-400 font-sans uppercase tracking-widest text-[9px] mb-1">Products in Store</div>
+                <div className="text-2xl font-black text-white">{productsLoading ? 'Loading...' : products.length}</div>
+                <div className="text-[9px] text-neutral-500 font-sans font-semibold mt-1">
+                  Active in Stock: {products.filter(p => String(p.status).toLowerCase() === 'active').length}
+                </div>
+              </div>
+            </div>
+
+            {/* Detailed Categories Table Filter Diagnostic */}
+            <div className="space-y-2">
+              <h4 className="font-sans font-black uppercase text-[10px] tracking-wider text-neutral-400">Category Filter Diagnostics</h4>
+              <div className="border border-neutral-800 rounded-xl overflow-hidden divide-y divide-neutral-800">
+                {categoryDetails.length === 0 ? (
+                  <div className="p-4 text-center text-neutral-500 font-sans">No categories currently returned from Supabase.</div>
+                ) : (
+                  categoryDetails.map((c) => (
+                    <div key={c.id} className="p-3 bg-neutral-950 hover:bg-neutral-900/50 transition-colors">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="font-bold text-white text-[12px]">{c.name}</span>
+                        <div className="flex gap-2">
+                          <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
+                            c.passedHome ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-900' : 'bg-red-950/80 text-red-400 border border-red-900'
+                          }`}>
+                            Home: {c.passedHome ? 'RENDERED' : 'FILTERED'}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="space-y-1 text-neutral-400 text-[10px]">
+                        <div><span className="text-neutral-600">ID:</span> {c.id} • <span className="text-neutral-600">Order:</span> {c.displayOrder}</div>
+                        {!c.passedHome && (
+                          <div className="text-amber-500 italic"><span className="text-neutral-600">Reason:</span> {c.reasons}</div>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Detailed Products by Category Match diagnostics */}
+            <div className="space-y-2">
+              <h4 className="font-sans font-black uppercase text-[10px] tracking-wider text-neutral-400">Products Grouped by Category Name/ID</h4>
+              <div className="bg-neutral-900/40 border border-neutral-800 rounded-xl p-3.5 space-y-2 font-sans">
+                {categories.map(cat => {
+                  const matchingCount = products.filter(p => {
+                    const pCat = String(p.category || '').trim().toLowerCase();
+                    const cId = String(cat.id || '').trim().toLowerCase();
+                    const cName = String(cat.name || '').trim().toLowerCase();
+                    const cSlug = String(cat.slug || '').trim().toLowerCase();
+                    return pCat === cId || pCat === cName || pCat === cSlug;
+                  }).length;
+
+                  return (
+                    <div key={`debug-cat-row-${cat.id}`} className="flex justify-between text-neutral-300 font-mono text-xs py-1 border-b border-neutral-800 last:border-0">
+                      <span className="font-semibold text-white truncate max-w-[280px]">{cat.name}</span>
+                      <span className="font-bold text-neutral-400">({matchingCount} products matched)</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="bg-neutral-900 border-t border-neutral-800 p-3 text-[10px] text-neutral-500 text-center font-sans">
+            Device LocalTime: {new Date().toLocaleTimeString()}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

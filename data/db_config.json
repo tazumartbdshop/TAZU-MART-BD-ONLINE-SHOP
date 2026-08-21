@@ -1,0 +1,8 @@
+{
+  "host": "srv2141.hstgr.io",
+  "port": 3306,
+  "database": "u103041740_TAZU_MART_BD",
+  "user": "u103041740_tazumartbd",
+  "password": "YOU@suf60679",
+  "ssl": false
+}
