@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { getDb } from '../lib/db';
 import { objectToSnake, objectToCamel } from '../lib/dbUtils';
 import { broadcastSync } from '../lib/broadcastSync';
+import { INITIAL_SUPABASE_BANNERS } from '../data/initialSupabaseData';
 
 export interface Banner {
   id: string;
@@ -92,14 +93,14 @@ const getCachedBanners = (): Banner[] => {
     const cached = localStorage.getItem('db_cached_banners');
     if (cached) {
       const parsed = JSON.parse(cached);
-      if (Array.isArray(parsed)) {
+      if (Array.isArray(parsed) && parsed.length > 0) {
         return parsed;
       }
     }
   } catch (e) {
     console.warn("Failed to parse cached banners from localStorage:", e);
   }
-  return [];
+  return INITIAL_SUPABASE_BANNERS as Banner[];
 };
 
 const saveCachedBanners = (banners: Banner[]) => {

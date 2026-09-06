@@ -8,6 +8,7 @@ import fsPromises from "fs/promises";
 import { analyticsEngine } from "./server/analyticsEngine";
 import { handleAiChatRequest, getAllConversations, postModeratorReply, toggleHandoffStatus } from "./server/aiSupportHandler";
 import { dbSelect, dbInsert, dbUpdate, dbDelete, query, checkDbHealth, setupMysqlPool, syncLocalDbToMysql } from "./src/db/mysql";
+import { supabaseAdmin as realSupabaseAdmin, supabaseUrl as realSupabaseUrl } from "./src/lib/supabaseServer";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
@@ -133,96 +134,10 @@ async function startServer() {
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-  console.log("[Server Boot] Hostinger MySQL Database Architecture initialized.");
+  console.log("[Server Boot] Supabase Authoritative Database Architecture initialized.");
 
-  const SUPABASE_CONFIG_FILE = path.join(process.cwd(), 'supabase_config.json');
-  const savedSupabaseUrl = "";
-  const savedSupabaseKey = "";
-  const savedSupabaseServiceKey = "";
-
-  const mysqlDbClient: any = {
-    from: (table: string) => ({
-      select: (cols?: string, opts?: any) => {
-        const queryChain: any = {
-          eq: (col: string, val: any) => {
-            queryChain._where = { ...(queryChain._where || {}), [col]: val };
-            return queryChain;
-          },
-          neq: (col: string, val: any) => queryChain,
-          order: () => queryChain,
-          limit: (l: number) => queryChain,
-          maybeSingle: async () => {
-            const rows = await dbSelect(table);
-            const where = queryChain._where || {};
-            const match = rows.find((r: any) => Object.keys(where).every(k => String(r[k]) === String(where[k])));
-            return { data: match || null, error: null };
-          },
-          then: (onfulfilled?: any) => {
-            return dbSelect(table).then(rows => {
-              const where = queryChain._where || {};
-              const filtered = rows.filter((r: any) => Object.keys(where).every(k => String(r[k]) === String(where[k])));
-              return { data: filtered, error: null };
-            }).then(onfulfilled);
-          }
-        };
-        return queryChain;
-      },
-      insert: async (payload: any) => {
-        const items = Array.isArray(payload) ? payload : [payload];
-        for (const item of items) {
-          await dbInsert(table, item);
-        }
-        return { data: items, error: null };
-      },
-      update: (payload: any) => ({
-        eq: async (col: string, val: any) => {
-          await dbUpdate(table, payload, col, val);
-          return { data: [payload], error: null };
-        }
-      }),
-      delete: () => ({
-        eq: async (col: string, val: any) => {
-          await dbDelete(table, col, val);
-          return { error: null };
-        }
-      }),
-      upsert: async (payload: any) => {
-        const items = Array.isArray(payload) ? payload : [payload];
-        for (const item of items) {
-          await dbInsert(table, item);
-        }
-        return { data: items, error: null };
-      }
-    }),
-    auth: {
-      admin: {
-        listUsers: async () => {
-          const users = await dbSelect('users');
-          return { data: { users }, error: null };
-        },
-        createUser: async (userData: any) => {
-          await dbInsert('users', userData);
-          return { data: { user: userData }, error: null };
-        },
-        getUserById: async (id: string) => {
-          const users = await dbSelect('users');
-          const user = users.find((u: any) => u.id === id);
-          return { data: { user }, error: null };
-        },
-        updateUserById: async (id: string, updates: any) => {
-          await dbUpdate('users', updates, 'id', id);
-          return { data: { user: updates }, error: null };
-        },
-        deleteUser: async (id: string) => {
-          await dbDelete('users', 'id', id);
-          return { error: null };
-        },
-        generateLink: async () => ({ data: { properties: { action_link: '' } }, error: null })
-      }
-    }
-  };
-  const supabaseAdmin = mysqlDbClient;
-  const supabaseServiceRole = mysqlDbClient;
+  const supabaseAdmin = realSupabaseAdmin;
+  const supabaseServiceRole = realSupabaseAdmin;
 
   // ---------------------------------------------------------------------------
   // Hostinger MySQL Universal Database Bridge Endpoints
@@ -499,11 +414,99 @@ async function startServer() {
 
   // Direct Products REST API Endpoints
   app.get("/api/products", async (req, res) => {
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.setHeader('X-Backend-API', 'TazuMart-NodeJS');
     try {
       const rows = await dbSelect('products');
-      res.json({ success: true, products: rows });
+      res.json({ success: true, products: rows, data: rows });
     } catch (err: any) {
+      console.error("[GET /api/products Error]:", err);
       res.status(500).json({ success: false, products: [], error: err.message });
+    }
+  });
+
+  app.post("/api/products", async (req, res) => {
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.setHeader('X-Backend-API', 'TazuMart-NodeJS');
+    try {
+      const productData = req.body;
+      if (!productData || (!productData.name && !productData.title)) {
+        return res.status(400).json({ success: false, error: "Product name is required" });
+      }
+
+      if (!productData.id) {
+        productData.id = `prod_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+      }
+
+      const newProduct = {
+        ...productData,
+        created_at: productData.created_at || productData.createdAt || new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      await dbInsert('products', newProduct);
+      invalidateHomepageCache();
+      console.log(`[API] POST /api/products - Saved successfully: ${newProduct.id}`);
+
+      res.status(200).json({
+        success: true,
+        message: "Product saved successfully to MySQL",
+        product: newProduct,
+        data: newProduct
+      });
+    } catch (err: any) {
+      console.error("[POST /api/products Error]:", err);
+      res.status(500).json({ success: false, error: err.message || "Database insertion failed" });
+    }
+  });
+
+  app.put("/api/products/:id", async (req, res) => {
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.setHeader('X-Backend-API', 'TazuMart-NodeJS');
+    try {
+      const productId = req.params.id;
+      const updateData = req.body;
+      if (!productId) {
+        return res.status(400).json({ success: false, error: "Product ID is required" });
+      }
+      console.log(`[API] PUT /api/products/${productId} - Updating product...`);
+
+      const updatedPayload = {
+        ...updateData,
+        updated_at: new Date().toISOString()
+      };
+      delete updatedPayload.id;
+
+      await dbUpdate('products', productId, updatedPayload);
+      invalidateHomepageCache();
+
+      const resultProduct = { id: productId, ...updatedPayload };
+      res.status(200).json({
+        success: true,
+        message: "Product updated successfully in MySQL",
+        product: resultProduct,
+        data: resultProduct
+      });
+    } catch (err: any) {
+      console.error("[PUT /api/products/:id Error]:", err);
+      res.status(500).json({ success: false, error: err.message || "Database update failed" });
+    }
+  });
+
+  app.delete("/api/products/:id", async (req, res) => {
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.setHeader('X-Backend-API', 'TazuMart-NodeJS');
+    try {
+      const productId = req.params.id;
+      if (!productId) {
+        return res.status(400).json({ success: false, error: "Product ID is required" });
+      }
+      await dbDelete('products', productId);
+      invalidateHomepageCache();
+      res.status(200).json({ success: true, message: "Product deleted successfully" });
+    } catch (err: any) {
+      console.error("[DELETE /api/products/:id Error]:", err);
+      res.status(500).json({ success: false, error: err.message || "Failed to delete product" });
     }
   });
 
@@ -1069,8 +1072,8 @@ async function startServer() {
 
       // Sync active url to branding_settings and settings table
       if (clientToUse && activeUrl) {
-        clientToUse.from('branding_settings').upsert([{ id: 'global', login_banner: activeUrl, updated_at: new Date().toISOString() }]).then(() => {}).catch(() => {});
-        clientToUse.from('settings').upsert([{ id: 'login_banner', value: activeUrl, updated_at: new Date().toISOString() }]).then(() => {}).catch(() => {});
+        clientToUse.from('branding_settings').upsert([{ id: 'global', login_banner: activeUrl, updated_at: new Date().toISOString() }]).then(() => {}, () => {});
+        clientToUse.from('settings').upsert([{ id: 'login_banner', value: activeUrl, updated_at: new Date().toISOString() }]).then(() => {}, () => {});
       }
 
       return res.json({
@@ -1100,7 +1103,7 @@ async function startServer() {
       if (clientToUse) {
         for (const item of reordered) {
           if (item.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(item.id)) {
-            clientToUse.from('login_banners').update({ sort_order: item.sort_order }).eq('id', item.id).then(() => {}).catch(() => {});
+            clientToUse.from('login_banners').update({ sort_order: item.sort_order }).eq('id', item.id).then(() => {}, () => {});
           }
         }
       }
@@ -1760,7 +1763,7 @@ async function startServer() {
 
         if (!user) {
           // Check Supabase Auth
-          const { data: authUser, error: authFindError } = await supabaseServiceRole.auth.admin.listUsers({
+          const { data: authUser, error: authFindError } = await (supabaseServiceRole.auth.admin.listUsers as any)({
             filters: { phone: formattedPhone }
           });
 
@@ -4108,8 +4111,8 @@ Please ask me your query or select a quick question template below!`;
   });
 
   async function fetchTableColumnsDetailed(tableName: string): Promise<{ exists: boolean; columns: string[]; error?: string }> {
-    let url = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || savedSupabaseUrl;
-    let key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || savedSupabaseServiceKey || savedSupabaseKey;
+    let url = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || realSupabaseUrl;
+    let key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
     
     if (!url || !key) {
       const fsConfig = await getSupabaseCredentialsFromFirestore();

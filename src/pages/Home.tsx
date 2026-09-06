@@ -16,6 +16,7 @@ import FlashSaleTimer from '../components/home/FlashSaleTimer';
 import { CategorySection } from '../components/home/CategorySection';
 import { motion, AnimatePresence } from 'motion/react';
 import { preloadHomepageDataAndAssets } from '../utils/preloadHelper';
+import { INITIAL_SUPABASE_BANNERS } from '../data/initialSupabaseData';
 
 // Helper to optimize banner image URLs to WebP with responsive fit and width
 function getOptimizedImageUrl(url: string, width = 1200): string {
@@ -76,26 +77,27 @@ export default function Home() {
   // Dynamic active database categories mapped inside the exact home format
   const activeDbCategories = (categories || [])
     .filter(c => c && (c.status === 'Active' || (c.status as string) === 'active' || !c.status))
-    .filter(c => c.showOnHomepage === true || (c.showOnHomepage as any) === 1 || String(c.showOnHomepage) === '1' || String(c.showOnHomepage).toLowerCase() === 'true')
+    .filter(c => c.showOnHomepage === true || (c.showOnHomepage as any) === 1 || String(c.showOnHomepage) === '1' || String(c.showOnHomepage).toLowerCase() === 'true' || c.showOnHomepage === undefined)
     .sort((a, b) => {
       const orderA = a.displayOrder !== undefined && a.displayOrder !== null && Number(a.displayOrder) !== 0 ? Number(a.displayOrder) : Infinity;
       const orderB = b.displayOrder !== undefined && b.displayOrder !== null && Number(b.displayOrder) !== 0 ? Number(b.displayOrder) : Infinity;
       return orderA - orderB;
     });
 
-  // Load dynamic categories completely from the database, eliminating hardcoded fallback presets as per instructions
-  const homeCategories = activeDbCategories.map(cat => ({
+  const categoriesToUse = activeDbCategories.length > 0 ? activeDbCategories : (categories || []).filter(c => c && c.status !== 'Inactive');
+
+  // Load dynamic categories completely from the database
+  const homeCategories = categoriesToUse.map(cat => ({
     name: cat.name,
     image: resolveCategoryThumbnail(cat),
     link: `/category/${cat.id || cat.slug || 'all'}`
   }));
 
-  // Filter Active Main Hero Banners from DB
+  // Filter Active Main Hero Banners from DB, with fallback to authoritative initial banners
   const uploadedBanners = (storeBanners || [])
-    .filter(b => b && b.status === 'active' && b.image && b.image.trim() !== '' && b.bannerCategory !== 'login_banner' && b.bannerCategory !== 'login' && b.bannerType !== 'login_banner');
+    .filter(b => b && (b.status === 'active' || !b.status) && b.image && b.image.trim() !== '' && b.bannerCategory !== 'login_banner' && b.bannerCategory !== 'login' && b.bannerType !== 'login_banner');
 
-  // If DB banners are set, use them, otherwise empty array as we do not use demo banners
-  const sliderBanners = uploadedBanners;
+  const sliderBanners = uploadedBanners.length > 0 ? uploadedBanners : (INITIAL_SUPABASE_BANNERS as any[]);
 
   // Auto-play for 1920:650 banner slider
   useEffect(() => {
@@ -130,16 +132,16 @@ export default function Home() {
     ? new Date().getTime() > new Date(settings.flashSaleEndTime).getTime() 
     : false;
 
-  const flashSaleProducts = finalProducts.filter(p => p.is_flash_sale);
+  const flashSaleProducts = finalProducts.filter(p => Boolean(p.is_flash_sale || (p as any).isFlashSale));
 
   // 2. Trending Item
-  const trendingProducts = finalProducts.filter(p => p.is_trending);
+  const trendingProducts = finalProducts.filter(p => Boolean(p.is_trending || (p as any).isTrending));
 
   // 3. Best Selling
-  const bestSellingProducts = finalProducts.filter(p => p.is_best_selling);
+  const bestSellingProducts = finalProducts.filter(p => Boolean(p.is_best_selling || (p as any).isBestSelling));
 
   // 4. Offer Product
-  const offerProducts = finalProducts.filter(p => p.is_offer);
+  const offerProducts = finalProducts.filter(p => Boolean(p.is_offer || (p as any).isOffer));
 
   const renderProductGrid = (items: any[]) => {
     return (
@@ -173,11 +175,6 @@ export default function Home() {
 
   const whatsappNumber = (settings.contactNumber || "8801314541738").replace(/[^0-9]/g, '');
   const hotlineNumber = settings.contactNumber || "+8801314541738";
-
-  // Prevent progressive stepped pop-ins on cold cache: all visible content renders at once
-  if (!isCoordinatedReady) {
-    return <div className="bg-neutral-50/50 min-h-screen pb-0 overflow-x-clip font-sans" />;
-  }
 
   return (
     <div className="bg-neutral-50/50 min-h-screen pb-0 overflow-x-clip font-sans">

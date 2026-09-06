@@ -3,6 +3,7 @@ import { getDb } from '../lib/db';
 import { deleteImage } from '../lib/imageUtils';
 import { objectToSnake, objectToCamel } from '../lib/dbUtils';
 import { broadcastSync } from '../lib/broadcastSync';
+import { INITIAL_SUPABASE_CATEGORIES } from '../data/initialSupabaseData';
 
 export interface Category {
   id: string;
@@ -203,14 +204,14 @@ const getCachedCategories = (): Category[] => {
     const cached = localStorage.getItem('db_cached_categories');
     if (cached) {
       const parsed = JSON.parse(cached);
-      if (Array.isArray(parsed)) {
+      if (Array.isArray(parsed) && parsed.length > 0) {
         return parsed;
       }
     }
   } catch (e) {
     console.warn("Failed to parse cached categories from localStorage:", e);
   }
-  return [];
+  return INITIAL_SUPABASE_CATEGORIES as Category[];
 };
 
 const saveCachedCategories = (categories: Category[]) => {
@@ -285,7 +286,11 @@ export const mapDbToCategory = (row: any): Category => {
     metaDescription: camelRow.metaDescription || '',
     keywords: camelRow.keywords || '',
     isDemo: false,
-    sliderSettings: camelRow.sliderSettings || null,
+    sliderSettings: typeof camelRow.sliderSettings === 'string'
+      ? (() => {
+          try { return JSON.parse(camelRow.sliderSettings); } catch { return null; }
+        })()
+      : (camelRow.sliderSettings || null),
     imageUrl: ensureAbsoluteUrl(rawIcon),
     image_url: ensureAbsoluteUrl(rawIcon)
   };

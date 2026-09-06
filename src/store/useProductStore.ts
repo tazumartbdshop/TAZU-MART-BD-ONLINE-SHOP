@@ -4,6 +4,7 @@ import { deleteImage } from '../lib/imageUtils';
 import { objectToSnake, objectToCamel } from '../lib/dbUtils';
 import { broadcastSync } from '../lib/broadcastSync';
 import { generateSlug } from '../lib/utils';
+import { INITIAL_SUPABASE_PRODUCTS } from '../data/initialSupabaseData';
 
 // Strict list of actual database columns present in the MySQL `products` table
 export const VALID_PRODUCT_COLUMNS = new Set([
@@ -490,14 +491,14 @@ const getCachedProducts = (): Product[] => {
     const cached = localStorage.getItem('db_cached_products');
     if (cached) {
       const parsed = JSON.parse(cached);
-      if (Array.isArray(parsed)) {
+      if (Array.isArray(parsed) && parsed.length > 0) {
         return parsed;
       }
     }
   } catch (e) {
     console.warn("Failed to parse cached products from localStorage:", e);
   }
-  return [];
+  return INITIAL_SUPABASE_PRODUCTS as Product[];
 };
 
 const saveCachedProducts = (products: Product[]) => {
@@ -574,58 +575,81 @@ export const useProductStore = create<ProductState>((set, get) => ({
     saveCachedProducts(nextProducts);
     broadcastSync.publish('products', nextProducts);
     
-    if (db) {
-      try {
-        const dbPayload = objectToSnake(newProduct);
-        delete dbPayload.qnas; // Prevent column mismatch in DB
-        
-        const selfHealResult = await executeWithSelfHealingProducts(
-          async (prunedDbPayload) => {
-            return await db.from('products').insert([prunedDbPayload]);
-          },
-          dbPayload
-        );
-        
-        const { error, status, statusText } = selfHealResult;
-        if (error) {
-          // Rollback on error
+    let dbPayload = objectToSnake(newProduct);
+    delete dbPayload.qnas; // Prevent column mismatch in DB
+
+    // 1. Direct REST API POST (Single Source of Truth)
+    try {
+      const res = await fetch('/api/products', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(dbPayload)
+      });
+
+      const contentType = res.headers.get("content-type");
+      if (!res.ok) {
+        if (contentType && contentType.includes("application/json")) {
+          const errJson = await res.json();
+          throw new Error(errJson.error || `Server responded with status ${res.status}`);
+        } else {
+          const text = await res.text();
+          if (text.trim().startsWith('<!doctype') || text.trim().startsWith('<html') || text.includes('<html')) {
+            throw new Error(`Server Error (${res.status}): Backend service temporarily unavailable.`);
+          }
+          throw new Error(`Server Error (${res.status}): ${text.substring(0, 100)}...`);
+        }
+      }
+    } catch (apiErr: any) {
+      console.warn("Direct POST /api/products fallback to DB query:", apiErr);
+      // Fallback to secondary DB client
+      if (db) {
+        try {
+          const selfHealResult = await executeWithSelfHealingProducts(
+            async (prunedDbPayload) => {
+              return await db.from('products').insert([prunedDbPayload]);
+            },
+            dbPayload
+          );
+          
+          const { error } = selfHealResult;
+          if (error) {
+            // Rollback on error
+            set({ products: currentProducts });
+            saveCachedProducts(currentProducts);
+            broadcastSync.publish('products', currentProducts);
+            throw new Error(error.message || apiErr.message || "Failed to add product to database");
+          }
+        } catch (dbErr: any) {
           set({ products: currentProducts });
           saveCachedProducts(currentProducts);
           broadcastSync.publish('products', currentProducts);
-          console.error("%c[Product Sync] INSERT ERROR:", "color: #ef4444; font-weight: bold;", {
-            code: error.code,
-            message: error.message,
-            hint: (error as any).hint,
-            details: (error as any).details,
-            httpStatus: status,
-            httpStatusText: statusText
-          });
-          throw new Error(error.message || "Failed to add product to database");
-        } else {
-          // Re-sync with backend to ensure single source of truth
-          try {
-            const res = await fetch('/api/products?limit=100');
-            if (res.ok) {
-              const json = await res.json();
-              if (json && Array.isArray(json.products)) {
-                const mapped = json.products.map(mapDbToProduct);
-                set({ products: mapped, isLoading: false, isLoaded: true });
-                saveCachedProducts(mapped);
-                broadcastSync.publish('products', mapped);
-              }
-            }
-          } catch (syncErr) {
-            console.warn("Background product sync after insert:", syncErr);
-          }
+          throw dbErr;
         }
-      } catch (err: any) {
-        // Rollback on error
+      } else {
         set({ products: currentProducts });
         saveCachedProducts(currentProducts);
         broadcastSync.publish('products', currentProducts);
-        console.error("Product insert exception:", err);
-        throw new Error(err.message || "Failed to add product to database");
+        throw apiErr;
       }
+    }
+
+    // Re-sync with backend to ensure single source of truth
+    try {
+      const res = await fetch('/api/products?limit=100');
+      if (res.ok) {
+        const json = await res.json();
+        if (json && Array.isArray(json.products)) {
+          const mapped = json.products.map(mapDbToProduct);
+          set({ products: mapped, isLoading: false, isLoaded: true });
+          saveCachedProducts(mapped);
+          broadcastSync.publish('products', mapped);
+        }
+      }
+    } catch (syncErr) {
+      console.warn("Background product sync after insert:", syncErr);
     }
   },
   
@@ -668,59 +692,87 @@ export const useProductStore = create<ProductState>((set, get) => ({
     saveCachedProducts(updatedProducts);
     broadcastSync.publish('products', updatedProducts);
     
-    if (db) {
-      try {
-        const dbPayload = objectToSnake(finalPayload);
-        delete dbPayload.qnas; // Prevent column mismatch in DB
-        delete dbPayload.id; // Prevent updating id key
-        delete dbPayload.created_at; // Prevent changing created_at timestamp
-        
-        const selfHealResult = await executeWithSelfHealingProducts(
-          async (prunedDbPayload) => {
-            return await db.from('products').update(prunedDbPayload).eq('id', id);
-          },
-          dbPayload
-        );
-        
-        const { error } = selfHealResult;
-        if (error) {
-          // Rollback on error
+    const dbPayload = objectToSnake(finalPayload);
+    delete dbPayload.qnas; // Prevent column mismatch in DB
+    delete dbPayload.id; // Prevent updating id key
+    delete dbPayload.created_at; // Prevent changing created_at timestamp
+    
+    // 1. Direct REST API PUT
+    try {
+      const res = await fetch(`/api/products/${id}`, {
+        method: 'PUT',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(dbPayload)
+      });
+
+      const contentType = res.headers.get("content-type");
+      if (!res.ok) {
+        if (contentType && contentType.includes("application/json")) {
+          const errJson = await res.json();
+          throw new Error(errJson.error || `Server responded with status ${res.status}`);
+        } else {
+          const text = await res.text();
+          if (text.trim().startsWith('<!doctype') || text.trim().startsWith('<html') || text.includes('<html')) {
+            throw new Error(`Server Error (${res.status}): Backend service temporarily unavailable.`);
+          }
+          throw new Error(`Server Error (${res.status}): ${text.substring(0, 100)}...`);
+        }
+      }
+    } catch (apiErr: any) {
+      console.warn("Direct PUT /api/products/:id fallback to DB query:", apiErr);
+      if (db) {
+        try {
+          const selfHealResult = await executeWithSelfHealingProducts(
+            async (prunedDbPayload) => {
+              return await db.from('products').update(prunedDbPayload).eq('id', id);
+            },
+            dbPayload
+          );
+          
+          const { error } = selfHealResult;
+          if (error) {
+            set({ products: currentProducts });
+            saveCachedProducts(currentProducts);
+            broadcastSync.publish('products', currentProducts);
+            throw new Error(error.message || apiErr.message || "Failed to update product in database");
+          }
+        } catch (dbErr: any) {
           set({ products: currentProducts });
           saveCachedProducts(currentProducts);
           broadcastSync.publish('products', currentProducts);
-          console.error("Database update error:", error);
-          throw new Error(error.message || "Failed to update product in database");
-        } else {
-          // Re-sync with backend
-          try {
-            const res = await fetch('/api/products?limit=100');
-            if (res.ok) {
-              const json = await res.json();
-              if (json && Array.isArray(json.products)) {
-                const mapped = json.products.map(mapDbToProduct);
-                set({ products: mapped, isLoading: false, isLoaded: true });
-                saveCachedProducts(mapped);
-                broadcastSync.publish('products', mapped);
-              }
-            }
-          } catch (syncErr) {
-            console.warn("Background product sync after update:", syncErr);
-          }
+          throw dbErr;
         }
-      } catch (err: any) {
-        // Rollback on error
+      } else {
         set({ products: currentProducts });
         saveCachedProducts(currentProducts);
         broadcastSync.publish('products', currentProducts);
-        console.error("Product update exception:", err);
-        throw new Error(err.message || "Failed to update product in database");
+        throw apiErr;
       }
+    }
+
+    // Re-sync with backend
+    try {
+      const res = await fetch('/api/products?limit=100');
+      if (res.ok) {
+        const json = await res.json();
+        if (json && Array.isArray(json.products)) {
+          const mapped = json.products.map(mapDbToProduct);
+          set({ products: mapped, isLoading: false, isLoaded: true });
+          saveCachedProducts(mapped);
+          broadcastSync.publish('products', mapped);
+        }
+      }
+    } catch (syncErr) {
+      console.warn("Background product sync after update:", syncErr);
     }
   },
   
   deleteProduct: async (id) => {
     const db = getDb();
-    console.log(`[Supabase Log] Preparing to delete product document: products/${id}`);
+    console.log(`[Product Store] Deleting product: ${id}`);
     
     const currentProducts = get().products;
     const product = currentProducts.find(p => p.id === id);
@@ -737,7 +789,6 @@ export const useProductStore = create<ProductState>((set, get) => ({
           });
         }
         
-        // Execute background deletions securely
         Promise.all(Array.from(urlsToDelete).map(url => deleteImage(url)))
           .catch(err => console.warn("Failed to delete some product storage files:", err));
       } catch (importErr) {
@@ -751,30 +802,11 @@ export const useProductStore = create<ProductState>((set, get) => ({
     saveCachedProducts(newProducts);
     broadcastSync.publish('products', newProducts);
     
-    if (db) {
-      const { error } = await db.from('products').delete().eq('id', id);
-      if (error) {
-        // Rollback on error
-        set({ products: currentProducts });
-        saveCachedProducts(currentProducts);
-        broadcastSync.publish('products', currentProducts);
-        console.error("Database delete error:", error);
-        throw new Error(error.message || "Failed to delete product from database");
-      } else {
-        try {
-          const res = await fetch('/api/products?limit=100');
-          if (res.ok) {
-            const json = await res.json();
-            if (json && Array.isArray(json.products)) {
-              const mapped = json.products.map(mapDbToProduct);
-              set({ products: mapped, isLoading: false, isLoaded: true });
-              saveCachedProducts(mapped);
-              broadcastSync.publish('products', mapped);
-            }
-          }
-        } catch (syncErr) {
-          console.warn("Background product sync after delete:", syncErr);
-        }
+    try {
+      await fetch(`/api/products/${id}`, { method: 'DELETE' });
+    } catch (e) {
+      if (db) {
+        await db.from('products').delete().eq('id', id);
       }
     }
   },

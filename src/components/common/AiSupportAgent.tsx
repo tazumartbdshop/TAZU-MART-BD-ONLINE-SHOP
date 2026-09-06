@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Bot, MessageSquare, X, Send, Image as ImageIcon, User, Phone, Sparkles, UserCheck, ArrowRight, RefreshCw, ShoppingBag, CheckCircle, Headphones, Loader2 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
 interface RecommendedProduct {
@@ -30,6 +30,13 @@ interface UserProfile {
 
 export function AiSupportAgent() {
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Hide AI Support Agent completely on Homepage
+  if (location.pathname === '/' || location.pathname === '') {
+    return null;
+  }
+
   const [isOpen, setIsOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);

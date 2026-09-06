@@ -96,7 +96,7 @@ export function UserLayout() {
       
       <MobileBottomNav />
       <StorefrontPopup />
-      <AiSupportAgent />
+      {location.pathname !== '/' && location.pathname !== '' && <AiSupportAgent />}
     </div>
   );
 }

@@ -4,6 +4,12 @@ import { useBannerStore } from '../store/useBannerStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useReviewStore } from '../store/useReviewStore';
 import { useOfferStore } from '../store/useOfferStore';
+import { 
+  INITIAL_SUPABASE_CATEGORIES, 
+  INITIAL_SUPABASE_BANNERS, 
+  INITIAL_SUPABASE_PRODUCTS, 
+  INITIAL_SUPABASE_SETTINGS 
+} from '../data/initialSupabaseData';
 
 function toCamelCase(str: string): string {
   return str.replace(/([-_][a-z])/ig, ($1) => {
@@ -29,7 +35,18 @@ export function objectToCamel(obj: any): any {
 }
 
 export function mapDbToBanner(row: any): any {
-  return objectToCamel(row);
+  const camel = objectToCamel(row);
+  return {
+    ...camel,
+    id: camel.id || row.id,
+    name: camel.name || row.name || 'Banner',
+    status: (camel.status || row.status || 'active').toLowerCase(),
+    image: camel.image || row.image || camel.imageUrl || row.image_url || '',
+    imageUrl: camel.imageUrl || row.image_url || camel.image || row.image || '',
+    order: Number(camel.order ?? row.order ?? camel.displayOrder ?? row.display_order ?? 0),
+    bannerType: camel.bannerType || row.banner_type || 'main_banner',
+    bannerCategory: camel.bannerCategory || row.banner_category || 'main_banner'
+  };
 }
 
 export function mapDbToProduct(row: any): any {
@@ -160,11 +177,11 @@ export function mapDbToProduct(row: any): any {
     seoPoints: parsedSeoPoints,
     variants: parsedVariants,
     shippingZones: parsedShippingZones,
-    is_flash_sale: !!camelRow.isFlashSale,
-    is_trending: !!camelRow.isTrending,
-    is_best_selling: !!camelRow.isBestSelling,
-    is_regular: !!camelRow.isRegular,
-    is_offer: !!camelRow.isOffer,
+    is_flash_sale: Boolean(camelRow.isFlashSale ?? (row && row.is_flash_sale) ?? camelRow.is_flash_sale),
+    is_trending: Boolean(camelRow.isTrending ?? (row && row.is_trending) ?? camelRow.is_trending),
+    is_best_selling: Boolean(camelRow.isBestSelling ?? (row && row.is_best_selling) ?? camelRow.is_best_selling),
+    is_regular: Boolean(camelRow.isRegular ?? (row && row.is_regular) ?? camelRow.is_regular),
+    is_offer: Boolean(camelRow.isOffer ?? (row && row.is_offer) ?? camelRow.is_offer),
     reward_coins: camelRow.rewardCoins,
     coin_enabled: camelRow.coinEnabled,
     isDemo: !!camelRow.isDemo,
@@ -237,25 +254,33 @@ export async function preloadHomepageDataAndAssets(): Promise<void> {
       }
 
       // 1. Map data to client models
-      const banners = (data.banners || []).map(mapDbToBanner);
-      const categories = (data.categories || []).map(mapDbToCategory);
-      const products = (data.products || []).map(mapDbToProduct);
+      const rawBanners = (data.banners || []).map(mapDbToBanner);
+      const rawCategories = (data.categories || []).map(mapDbToCategory);
+      const rawProducts = (data.products || []).map(mapDbToProduct);
       const reviews = (data.reviews || []).map(mapDbToReview);
       const offers = (data.offers || []);
 
-      // 2. Load settings
-      let settings = {};
-      if (data.settings && data.settings.length > 0) {
-        const row = data.settings[0];
-        if (row.value) {
-          try {
-            const parsedValue = typeof row.value === 'string' ? JSON.parse(row.value) : row.value;
-            settings = objectToCamel(parsedValue);
-          } catch {
-            settings = objectToCamel(row);
+      const banners = rawBanners.length > 0 ? rawBanners : (useBannerStore.getState().banners.length > 0 ? useBannerStore.getState().banners : INITIAL_SUPABASE_BANNERS);
+      const categories = rawCategories.length > 0 ? rawCategories : (useCategoryStore.getState().categories.length > 0 ? useCategoryStore.getState().categories : INITIAL_SUPABASE_CATEGORIES);
+      const products = rawProducts.length > 0 ? rawProducts : (useProductStore.getState().products.length > 0 ? useProductStore.getState().products : INITIAL_SUPABASE_PRODUCTS);
+
+      // 2. Load settings across all setting rows (especially general and banner config)
+      let settings: any = { ...INITIAL_SUPABASE_SETTINGS };
+      if (data.settings && Array.isArray(data.settings)) {
+        for (const row of data.settings) {
+          if (!row) continue;
+          if (row.value) {
+            try {
+              const parsedValue = typeof row.value === 'string' ? JSON.parse(row.value) : row.value;
+              if (parsedValue && typeof parsedValue === 'object' && !Array.isArray(parsedValue)) {
+                settings = { ...settings, ...objectToCamel(parsedValue) };
+              }
+            } catch {
+              settings = { ...settings, ...objectToCamel(row) };
+            }
+          } else {
+            settings = { ...settings, ...objectToCamel(row) };
           }
-        } else {
-          settings = objectToCamel(row);
         }
       }
 
@@ -269,9 +294,14 @@ export async function preloadHomepageDataAndAssets(): Promise<void> {
       } else {
         useOfferStore.setState({ isLoaded: true });
       }
-      if (Object.keys(settings).length > 0) {
-        useSettingsStore.setState({ settings: { ...useSettingsStore.getState().settings, ...settings }, isLoaded: true });
-      }
+      useSettingsStore.setState({ 
+        settings: { 
+          ...useSettingsStore.getState().settings, 
+          ...settings,
+          flashSaleEnabled: true 
+        }, 
+        isLoaded: true 
+      });
 
       // Save to local caches so subsequent views are instant from store initializer
       try {

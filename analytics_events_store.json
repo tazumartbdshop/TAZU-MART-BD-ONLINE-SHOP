@@ -1,12 +1,12 @@
 {
-  "updatedAt": "2026-08-21T04:15:38.823Z",
+  "updatedAt": "2026-09-06T04:31:37.228Z",
   "dailySummaries": {
-    "2026-08-21": {
-      "date": "2026-08-21",
+    "2026-09-06": {
+      "date": "2026-09-06",
       "visits": 0,
       "uniqueVisitors": 1,
       "visitorIds": [
-        "v_rogtcmo85_mt2f61jc"
+        "v_5ipykg3dy_mtpa61hd"
       ],
       "newAccounts": 0,
       "uniqueLoginUsers": 0,
@@ -23,24 +23,24 @@
   },
   "recentEvents": [
     {
-      "eventId": "page_view_kirmhu_1787285313901",
-      "sessionId": "s_q92z7odxd_mt2f61je",
-      "visitorId": "v_rogtcmo85_mt2f61jc",
+      "eventId": "page_view_wjm7c0_1788668805834",
+      "sessionId": "s_ky5ulz11a_mtpa61hh",
+      "visitorId": "v_5ipykg3dy_mtpa61hd",
       "userId": null,
       "userName": null,
       "eventType": "page_view",
       "path": "/",
       "title": "TAZU MART BD - Premium Fashion & Lifestyle",
       "referrer": "https://aistudio.google.com/",
-      "timestamp": "2026-08-21T04:08:33.900Z",
-      "dateString": "2026-08-21",
+      "timestamp": "2026-09-06T04:26:45.834Z",
+      "dateString": "2026-09-06",
       "device": {
         "isMobile": true,
-        "screen": "403x699",
-        "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Mobile Safari/537.36"
+        "screen": "421x581",
+        "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36"
       },
       "metadata": {},
-      "ip": "103.16.250.30"
+      "ip": "103.16.250.5"
     }
   ]
 }
