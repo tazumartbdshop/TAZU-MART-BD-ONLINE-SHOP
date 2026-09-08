@@ -7,7 +7,7 @@ const passwords = [
   'you@suf60679',
   'Yousuf60679',
   'Yousuf@60679',
-  'admin.tazumartbd@gmail.com',
+  'admin.iyabd@gmail.com',
   'admin123',
   'admin1234',
   'adminpassword',
@@ -15,12 +15,12 @@ const passwords = [
   'chefpassword',
   '12345678',
   'password',
-  'tazumart',
-  'tazumartbd',
-  'TazuMart@2024',
-  'TazuMart@2025',
-  'TazuMart@2026',
-  'TAZU_MART_BD',
+  'iyabd',
+  'iyabd',
+  'IYABD@2024',
+  'IYABD@2025',
+  'IYABD@2026',
+  'IYABD',
   'mdimtiazkhan.devolop@gmail.com'
 ];
 

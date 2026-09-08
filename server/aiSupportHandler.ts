@@ -113,7 +113,7 @@ export async function handleAiChatRequest(
     : "No products currently available in database.";
 
   // 4. Construct System Instruction with strict anti-hallucination rules
-  const systemPrompt = `You are TAZU MART BD AI Support Agent (তাজু মার্ট বিডি এআই সাপোর্ট এজেন্ট).
+  const systemPrompt = `You are IYABD AI Support Agent (আইওয়াইএবিডি এআই সাপোর্ট এজেন্ট).
 You assist customers politely, professionally, and accurately in Bengali (বাংলা) or English according to the language used by the customer.
 
 CUSTOMER DETAILS:
@@ -121,8 +121,8 @@ CUSTOMER DETAILS:
 - Mobile Number: ${mobileNumber || "N/A"}
 
 COMPANY & WEBSITE INFORMATION:
-- Brand Name: TAZU MART BD (তাজু মার্ট বিডি)
-- Website: https://tazumartbd.com
+- Brand Name: IYABD (আইওয়াইএবিডি)
+- Website: https://iyabd.com
 - Tagline: Premium Fashion & Lifestyle Shopping Platform
 - Customer Support: Active Online Support
 
@@ -164,7 +164,7 @@ STRICT ANTI-HALLUCINATION RULES:
       formattedMessages.push({
         role: "user",
         content: [
-          { type: "text", text: m.content || "Analyse this product image and search for matching products in TAZU MART BD database." },
+          { type: "text", text: m.content || "Analyse this product image and search for matching products in IYABD database." },
           { type: "image_url", image_url: { url: m.image } }
         ]
       });
@@ -180,7 +180,7 @@ STRICT ANTI-HALLUCINATION RULES:
       formattedMessages[formattedMessages.length - 1] = {
         role: "user",
         content: [
-          { type: "text", text: typeof lastMsg.content === "string" ? lastMsg.content : "Please match this uploaded product image with products in TAZU MART BD database." },
+          { type: "text", text: typeof lastMsg.content === "string" ? lastMsg.content : "Please match this uploaded product image with products in IYABD database." },
           { type: "image_url", image_url: { url: image } }
         ]
       };
@@ -205,7 +205,7 @@ STRICT ANTI-HALLUCINATION RULES:
 
     // Fallback response if OpenAI API key is placeholder or invalid
     if (apiErr?.status === 401 || apiErr?.message?.includes("API key")) {
-      aiReplyText = "হ্যালো " + (customerName || "গ্রাহক") + "! TAZU MART BD AI Support Agent-এ আপনাকে স্বাগতম। আমাদের OpenAI API Key টি বর্তমানে সিস্টেম আপডেট প্রক্রিয়ায় রয়েছে। আপনি আমাদের ওয়েবসাইটের ক্যাটালগ থেকে সব প্রোডাক্ট ব্রাউজ করতে পারেন অথবা প্রোডাক্ট সম্পর্কিত তথ্যের জন্য সরাসরি সাপোর্ট নম্বরে যোগাযোগ করতে পারেন।";
+      aiReplyText = "হ্যালো " + (customerName || "গ্রাহক") + "! IYABD AI Support Agent-এ আপনাকে স্বাগতম। আমাদের OpenAI API Key টি বর্তমানে সিস্টেম আপডেট প্রক্রিয়ায় রয়েছে। আপনি আমাদের ওয়েবসাইটের ক্যাটালগ থেকে সব প্রোডাক্ট ব্রাউজ করতে পারেন অথবা প্রোডাক্ট সম্পর্কিত তথ্যের জন্য সরাসরি সাপোর্ট নম্বরে যোগাযোগ করতে পারেন।";
     } else {
       aiReplyText = "ধন্যবাদ " + (customerName || "গ্রাহক") + "! আমাদের সিস্টেমে সাময়িক সংযোগ সমস্যা হচ্ছে। অনুগ্রহ করে আপনার বার্তাটি পুনরায় পাঠান বা হটলাইনে কল দিন।";
     }

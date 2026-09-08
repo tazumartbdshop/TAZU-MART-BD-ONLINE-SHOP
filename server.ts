@@ -6,13 +6,15 @@ import { createServer as createViteServer } from "vite";
 import multer from "multer";
 import fsPromises from "fs/promises";
 import { analyticsEngine } from "./server/analyticsEngine";
+import { serverMonitoringEngine } from "./server/serverMonitoringEngine";
+import { serverSideTrackingEngine } from "./server/serverSideTrackingEngine";
 import { handleAiChatRequest, getAllConversations, postModeratorReply, toggleHandoffStatus } from "./server/aiSupportHandler";
-import { dbSelect, dbInsert, dbUpdate, dbDelete, query, checkDbHealth, setupMysqlPool, syncLocalDbToMysql } from "./src/db/mysql";
+import { dbSelect, dbInsert, dbUpdate, dbDelete, query, checkDbHealth, setupMysqlPool, syncLocalDbToMysql, auditAndCleanupNullUsers } from "./src/db/mysql";
 import { supabaseAdmin as realSupabaseAdmin, supabaseUrl as realSupabaseUrl } from "./src/lib/supabaseServer";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
-const JWT_SECRET = process.env.JWT_SECRET || 'tazu_mart_hostinger_mysql_secret_2026';
+const JWT_SECRET = process.env.JWT_SECRET || 'iyabd_hostinger_mysql_secret_2026';
 
 // Configure storage for local uploads
 const storage = multer.diskStorage({
@@ -104,6 +106,17 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  // Run database audit and NULL cleanup on startup
+  try {
+    const auditResult = await auditAndCleanupNullUsers();
+    console.log(`[Database Audit Summary] Audited: ${auditResult.audited}, Cleaned records with NULL values: ${auditResult.cleaned}`);
+    if (auditResult.details.length > 0) {
+      console.log("[Database Audit Details]:", JSON.stringify(auditResult.details, null, 2));
+    }
+  } catch (err) {
+    console.warn("[Database Audit Warning] Failed to run automated audit:", err);
+  }
+
   // Domain Redirection Middleware (www to non-www) - Only for non-API routes
   app.use((req, res, next) => {
     const host = req.get('host');
@@ -133,6 +146,25 @@ async function startServer() {
 
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
+  // Response Time & Bandwidth Tracking Middleware for Server Monitoring
+  app.use((req, res, next) => {
+    const start = Date.now();
+    res.on("finish", () => {
+      const duration = Date.now() - start;
+      const contentLength = parseInt(res.get("content-length") || "0", 10);
+      serverMonitoringEngine.recordRequest(
+        duration,
+        contentLength,
+        res.statusCode,
+        req.originalUrl || req.url,
+        req.method,
+        req.ip,
+        req.get("user-agent")
+      );
+    });
+    next();
+  });
 
   console.log("[Server Boot] Supabase Authoritative Database Architecture initialized.");
 
@@ -261,7 +293,7 @@ async function startServer() {
       const result = await setupMysqlPool({
         host: host.trim(),
         port: parseInt(port || '3306', 10),
-        database: (database || 'tazu_mart_db').trim(),
+        database: (database || 'iyabd_db').trim(),
         user: user.trim(),
         password: password || '',
         ssl: Boolean(ssl)
@@ -291,7 +323,7 @@ async function startServer() {
   // Direct Categories REST API Endpoints (Universal & MySQL Connected)
   app.get("/api/categories", async (req, res) => {
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    res.setHeader('X-Backend-API', 'TazuMart-NodeJS');
+    res.setHeader('X-Backend-API', 'IYABD-NodeJS');
     try {
       const limit = parseInt(req.query.limit as string) || 500;
       const status = (req.query.status as string) || '';
@@ -325,7 +357,7 @@ async function startServer() {
 
   app.post("/api/categories", async (req, res) => {
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    res.setHeader('X-Backend-API', 'TazuMart-NodeJS');
+    res.setHeader('X-Backend-API', 'IYABD-NodeJS');
     try {
       const categoryData = req.body;
       const host = req.get('host');
@@ -364,7 +396,7 @@ async function startServer() {
 
   app.put("/api/categories/:id", async (req, res) => {
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    res.setHeader('X-Backend-API', 'TazuMart-NodeJS');
+    res.setHeader('X-Backend-API', 'IYABD-NodeJS');
     try {
       const categoryId = req.params.id;
       const updateData = req.body;
@@ -397,7 +429,7 @@ async function startServer() {
 
   app.delete("/api/categories/:id", async (req, res) => {
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    res.setHeader('X-Backend-API', 'TazuMart-NodeJS');
+    res.setHeader('X-Backend-API', 'IYABD-NodeJS');
     try {
       const categoryId = req.params.id;
       if (!categoryId) {
@@ -415,7 +447,7 @@ async function startServer() {
   // Direct Products REST API Endpoints
   app.get("/api/products", async (req, res) => {
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    res.setHeader('X-Backend-API', 'TazuMart-NodeJS');
+    res.setHeader('X-Backend-API', 'IYABD-NodeJS');
     try {
       const rows = await dbSelect('products');
       res.json({ success: true, products: rows, data: rows });
@@ -427,7 +459,7 @@ async function startServer() {
 
   app.post("/api/products", async (req, res) => {
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    res.setHeader('X-Backend-API', 'TazuMart-NodeJS');
+    res.setHeader('X-Backend-API', 'IYABD-NodeJS');
     try {
       const productData = req.body;
       if (!productData || (!productData.name && !productData.title)) {
@@ -462,7 +494,7 @@ async function startServer() {
 
   app.put("/api/products/:id", async (req, res) => {
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    res.setHeader('X-Backend-API', 'TazuMart-NodeJS');
+    res.setHeader('X-Backend-API', 'IYABD-NodeJS');
     try {
       const productId = req.params.id;
       const updateData = req.body;
@@ -495,7 +527,7 @@ async function startServer() {
 
   app.delete("/api/products/:id", async (req, res) => {
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    res.setHeader('X-Backend-API', 'TazuMart-NodeJS');
+    res.setHeader('X-Backend-API', 'IYABD-NodeJS');
     try {
       const productId = req.params.id;
       if (!productId) {
@@ -675,6 +707,18 @@ async function startServer() {
   // Serve local uploaded files statically at /uploads with browser cache
   const uploadsPath = path.join(process.cwd(), 'public', 'uploads');
   app.use('/uploads', express.static(uploadsPath, { maxAge: '30d', etag: true }));
+
+  // Serve static assets from public folder with 30d cache
+  const publicPath = path.join(process.cwd(), 'public');
+  app.use(express.static(publicPath, { maxAge: '30d', etag: true }));
+
+  // Browser & CDN Cache Control for static branding and banner assets
+  app.use((req, res, next) => {
+    if (req.url.match(/\.(webp|png|jpg|jpeg|gif|ico|svg)$/)) {
+      res.setHeader('Cache-Control', 'public, max-age=2592000, immutable');
+    }
+    next();
+  });
 
   app.post("/api/upload", (req, res, next) => {
     if (req.is('application/json') || (req.body && req.body.base64)) {
@@ -902,8 +946,18 @@ async function startServer() {
         } catch (bErr) {}
       }
 
+      if (loginBanners.length === 0) {
+        loginBanners = [{
+          id: 'default_auth_banner',
+          title: 'Welcome Banner',
+          image_url: '/auth-banner.webp',
+          is_active: true,
+          sort_order: 0
+        }];
+      }
+
       const activeBanner = loginBanners.find((b: any) => b.is_active || b.status === 'active') || loginBanners[0];
-      const activeUrl = activeBanner ? (activeBanner.image_url || activeBanner.image) : '';
+      const activeUrl = activeBanner ? (activeBanner.image_url || activeBanner.image) : '/auth-banner.webp';
 
       res.json({
         success: true,
@@ -913,6 +967,49 @@ async function startServer() {
     } catch (err: any) {
       console.error("[GET /api/login-banner] Error:", err);
       res.status(500).json({ success: false, error: err.message || "Failed to load login banners" });
+    }
+  });
+
+  // Cached API for active offers, campaigns, and offer banner
+  let serverCachedOffers: any = null;
+  let serverCachedOffersTime = 0;
+
+  app.get(["/api/active-offers", "/api/offers/active", "/api/campaigns/active"], async (req, res) => {
+    try {
+      res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=600');
+      const now = Date.now();
+      if (serverCachedOffers && (now - serverCachedOffersTime < 30000)) {
+        return res.json(serverCachedOffers);
+      }
+      const clientToUse = supabaseServiceRole || supabaseAdmin;
+      let offers: any[] = [];
+      let campaigns: any[] = [];
+      let bannerUrl = '';
+
+      if (clientToUse) {
+        try {
+          const [offersRes, campaignsRes, bannerRes] = await Promise.all([
+            clientToUse.from('offers').select('*').order('priority', { ascending: true }),
+            clientToUse.from('campaigns').select('*').eq('status', 'active'),
+            clientToUse.from('settings').select('imageUrl').eq('id', 'offers_page_banner').limit(1)
+          ]);
+          if (offersRes.data) offers = offersRes.data;
+          if (campaignsRes.data) campaigns = campaignsRes.data;
+          if (bannerRes.data && bannerRes.data[0]?.imageUrl) bannerUrl = bannerRes.data[0].imageUrl;
+        } catch (e) {}
+      }
+
+      const responseData = {
+        success: true,
+        offers,
+        campaigns,
+        bannerUrl
+      };
+      serverCachedOffers = responseData;
+      serverCachedOffersTime = now;
+      res.json(responseData);
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
     }
   });
 
@@ -1801,7 +1898,7 @@ async function startServer() {
         // Since we are in a custom flow, we can use admin.generateLink
         const { data: linkData, error: linkError } = await supabaseServiceRole.auth.admin.generateLink({
           type: 'magiclink',
-          email: user.email || `${user.id}@tazumart.com`, // Fallback email if needed
+          email: user.email || `${user.id}@iyabd.com`, // Fallback email if needed
           options: {
             data: { phone: formattedPhone }
           }
@@ -2488,7 +2585,7 @@ async function startServer() {
       const clientToUse = supabaseServiceRole || supabaseAdmin;
       let productUrls: string[] = [];
       let categoryUrls: string[] = [];
-      const siteUrl = "https://tazumartbd.com";
+      const siteUrl = "https://iyabd.com";
       const now = new Date().toISOString().split("T")[0];
 
       if (clientToUse) {
@@ -2565,7 +2662,7 @@ ${productUrls.join("\n")}
 
   // --- ROBOTS.TXT AUTOMATION ---
   app.get("/robots.txt", (req, res) => {
-    const robotsTxt = `# Robots.txt for TAZU MART BD (https://tazumartbd.com)
+    const robotsTxt = `# Robots.txt for IYABD (https://iyabd.com)
 # Generated dynamically for SEO crawling and security compliance
 
 User-agent: *
@@ -2599,7 +2696,7 @@ Disallow: /*?*query=
 
 # Crawl Delay & Sitemap Directive
 Crawl-delay: 1
-Sitemap: https://tazumartbd.com/sitemap.xml
+Sitemap: https://iyabd.com/sitemap.xml
 `;
     res.header("Content-Type", "text/plain; charset=utf-8");
     res.header("Cache-Control", "public, max-age=86400");
@@ -2703,6 +2800,49 @@ Sitemap: https://tazumartbd.com/sitemap.xml
     }
   });
 
+  // --- ADVANCED SERVER MONITORING & TELEMETRY APIS ---
+  app.get("/api/admin/server-monitoring", (req, res) => {
+    try {
+      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+      const days = parseInt((req.query.days as string) || "7", 10);
+      const validDays = days === 90 ? 90 : (days === 30 ? 30 : 7);
+      const data = serverMonitoringEngine.getDashboardTelemetry(validDays);
+      return res.json({ success: true, ...data });
+    } catch (err: any) {
+      console.error("[API Server Monitoring Error]:", err);
+      return res.status(500).json({ success: false, error: err?.message || "Failed to retrieve server monitoring metrics" });
+    }
+  });
+
+  app.post("/api/admin/server-monitoring/test-alert", (req, res) => {
+    try {
+      const { type } = req.body || {};
+      const alert = serverMonitoringEngine.triggerTestAlert(type || "cpu");
+      return res.json({ success: true, alert });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err?.message });
+    }
+  });
+
+  app.post("/api/admin/server-monitoring/dismiss-alert", (req, res) => {
+    try {
+      const { alertId } = req.body || {};
+      serverMonitoringEngine.dismissAlert(alertId);
+      return res.json({ success: true, message: "Alert dismissed" });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err?.message });
+    }
+  });
+
+  app.delete("/api/admin/server-monitoring/error-logs", (req, res) => {
+    try {
+      serverMonitoringEngine.clearErrorLogs();
+      return res.json({ success: true, message: "Error logs cleared" });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err?.message });
+    }
+  });
+
   // --- IN-MEMORY CACHE FOR MONITORING APIS ---
   let uptimeRobotCache: { data: any; timestamp: number } | null = null;
   const UPTIME_CACHE_TTL = 45 * 1000; // 45 seconds
@@ -2717,7 +2857,7 @@ Sitemap: https://tazumartbd.com/sitemap.xml
 
       const apiKey =
         process.env.UPTIMEROBOT_READ_ONLY_API_KEY ||
-        process.env.UPTIMEROBOT_TAZU_MART_API_KEY ||
+        process.env.UPTIMEROBOT_IYABD_API_KEY ||
         process.env.UPTIMEROBOT_MAIN_API_KEY;
 
       if (!apiKey) {
@@ -2830,7 +2970,7 @@ Sitemap: https://tazumartbd.com/sitemap.xml
     try {
       const apiKey =
         process.env.UPTIMEROBOT_READ_ONLY_API_KEY ||
-        process.env.UPTIMEROBOT_TAZU_MART_API_KEY ||
+        process.env.UPTIMEROBOT_IYABD_API_KEY ||
         process.env.UPTIMEROBOT_MAIN_API_KEY;
       if (!apiKey) return res.status(200).json({ status: "ok", uptime: "100%" });
 
@@ -2925,8 +3065,8 @@ Sitemap: https://tazumartbd.com/sitemap.xml
         description: "Pages targeting generic watch & wallet queries often generate broad search impressions with lower CTR (<2.5%).",
         actionable_advice: "Enhance Title tags with high-intent keywords like 'Best Price in BD', 'Cash on Delivery', 'Official Warranty' and add pricing numbers to Meta Descriptions.",
         target_pages: [
-          { url: "https://tazumartbd.com/category/wrist-watches", category: "WRIST WATCHES", opportunity: "Add price range and brand highlights to snippet" },
-          { url: "https://tazumartbd.com/category/wallet", category: "WALLET", opportunity: "Highlight 100% genuine leather material and fast delivery" }
+          { url: "https://iyabd.com/category/wrist-watches", category: "WRIST WATCHES", opportunity: "Add price range and brand highlights to snippet" },
+          { url: "https://iyabd.com/category/wallet", category: "WALLET", opportunity: "Highlight 100% genuine leather material and fast delivery" }
         ]
       });
 
@@ -2939,7 +3079,7 @@ Sitemap: https://tazumartbd.com/sitemap.xml
         description: "Products ranking in positions 5–20 require structured internal linking and rich schema to advance to Top 3 positions.",
         actionable_advice: "Add contextual internal links from Homepage and Category Carousels, and maintain valid schema.org Product JSON-LD markup with Offer and AggregateRating.",
         target_pages: activeProductItems.slice(0, 3).map(p => ({
-          url: `https://tazumartbd.com/product/${p.slug || p.id}`,
+          url: `https://iyabd.com/product/${p.slug || p.id}`,
           name: p.name,
           category: p.category || "Accessories",
           target_action: "Ensure rich snippet description has full specifications and warranty details"
@@ -2958,18 +3098,18 @@ Sitemap: https://tazumartbd.com/sitemap.xml
       });
 
       res.json({
-        property: "https://tazumartbd.com/",
+        property: "https://iyabd.com/",
         property_type: "URL-prefix / Domain Property",
         connected: isVerified || true,
         verification_status: isVerified ? "VERIFIED" : "CONNECTED_VIA_META_TAG",
         verification_method: "HTML Meta Tag / DNS Verification",
         verification_tag: verificationTag || '<meta name="google-site-verification" content="RZG35iUF5Hzynte8o1WGNJG7-OtqhsoEkE_LpHD88qc" />',
-        sitemap_url: "https://tazumartbd.com/sitemap.xml",
+        sitemap_url: "https://iyabd.com/sitemap.xml",
         indexed_pages_count: totalProducts + totalCategories + 11,
         total_products_indexed: totalProducts,
         total_categories_indexed: totalCategories,
         recommendations,
-        data_source: "Google Search Console & TAZU Technical SEO Engine",
+        data_source: "Google Search Console & IYABD Technical SEO Engine",
         disclaimer: "Search performance metrics and indexing status are determined by Google crawler algorithms. Recommendations are generated algorithmically to maximize organic visibility.",
         last_updated: new Date().toISOString()
       });
@@ -3059,7 +3199,7 @@ Sitemap: https://tazumartbd.com/sitemap.xml
       const geminiKey = (settings && settings.geminiKey) || process.env.GEMINI_API_KEY;
       
       const systemPrompt = (req.body.systemPrompt) || (settings && settings.systemPrompt) || 
-        "You are an AI Support Assistant for Tazu Mart, a premium e-commerce platform in Bangladesh. Answer questions helpfully.";
+        "You are an AI Support Assistant for IYABD, a premium e-commerce platform in Bangladesh. Answer questions helpfully.";
 
       // 1. Build contextual background string for dynamic website scan / data sync validation
       let websiteContext = "";
@@ -3253,8 +3393,8 @@ ${deliveryPolicy}
 ${refundPolicy}
 
 Refund is fully processed to your original MFS or card wallet after verification.`;
-        } else if (userMessageLower.includes("store") || userMessageLower.includes("tazu mart") || userMessageLower.includes("ঠিকানা") || userMessageLower.includes("company") || userMessageLower.includes("কোম্পানি")) {
-          replyMessage = `### 🏬 About Tazu Mart
+        } else if (userMessageLower.includes("store") || userMessageLower.includes("iyabd") || userMessageLower.includes("ঠিকানা") || userMessageLower.includes("company") || userMessageLower.includes("কোম্পানি")) {
+          replyMessage = `### 🏬 About IYABD
 ${storeInfo}`;
         }
       }
@@ -3296,8 +3436,8 @@ Please click the **"Request Human Handover"** button in this chat pane to instan
       // F. Default greeting matches & generic helpful fallback
       if (!replyMessage) {
         if (userMessageLower.includes("hello") || userMessageLower.includes("hi") || userMessageLower.includes("hey") || userMessageLower.includes("আসসালামু আলাইকুম") || userMessageLower.includes("কেমন আছেন")) {
-          replyMessage = `### 👋 Welcome to Tazu Mart AI!
-আসসালামু আলাইকুম! তাজু মার্ট এআই সাপোর্ট সেন্টারে আপনাকে স্বাগতম! 
+          replyMessage = `### 👋 Welcome to IYABD AI!
+আসসালামু আলাইকুম! আইওয়াইএবিডি এআই সাপোর্ট সেন্টারে আপনাকে স্বাগতম! 
 
 I can assist you instantly with:
 1. 📦 **Order Help & Policies** (Refund, return, and delivery guidelines)
@@ -3308,7 +3448,7 @@ I can assist you instantly with:
 Please ask me your query or select a quick question template below!`;
         } else {
           // Comprehensive bilingual smart assistant general response
-          replyMessage = `### 🤖 Tazu Mart automated Assistant
+          replyMessage = `### 🤖 IYABD automated Assistant
 ধন্যবাদ আপনার বার্তার জন্য! (Thank you for your message!)
 
 আমি আপনার প্রশ্নের সমাধান করার চেষ্টা করছি। আপনি যদি আমাদের পেমেন্ট, প্রোডাক্ট, কোয়ালিটি বা ডেলিভারি নিয়ে নির্দিষ্ট কিছু জানতে চান তাহলে নিচের টপিকগুলি টাইপ করতে পারেন:
@@ -3347,6 +3487,9 @@ Please ask me your query or select a quick question template below!`;
       const orderId = orderPayload.orderId || `TMB-${nextOrderNum}`;
       const now = new Date().toISOString();
       const id = orderPayload.id || Math.random().toString(36).substring(2, 9);
+
+      // Track order in server monitoring engine for Orders Per Minute (OPM)
+      serverMonitoringEngine.recordOrderCreation();
 
       const dbPayload: any = {
         id,
@@ -4730,6 +4873,89 @@ Please ask me your query or select a quick question template below!`;
       });
     } catch (err: any) {
       res.status(500).json({ error: "Failed to fire test event" });
+    }
+  });
+
+  // --- SERVER-SIDE TRACKING & SUPABASE QUOTA TELEMETRY APIS ---
+  app.get("/api/admin/marketing/server-side-telemetry", (req, res) => {
+    try {
+      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+      const telemetry = serverSideTrackingEngine.getFullTelemetry();
+      return res.json(telemetry);
+    } catch (err: any) {
+      console.error("[Server-Side Telemetry API Error]:", err);
+      return res.status(500).json({ success: false, error: err?.message || "Failed to load telemetry" });
+    }
+  });
+
+  app.post("/api/admin/marketing/simulate-event", (req, res) => {
+    try {
+      const { eventName, payload } = req.body || {};
+      if (!eventName) {
+        return res.status(400).json({ success: false, error: "eventName is required" });
+      }
+
+      const clientIp = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || '103.114.28.14';
+      const userAgent = req.headers['user-agent'] || 'Mozilla/5.0 Chrome/128.0';
+
+      const record = serverSideTrackingEngine.recordEvent(eventName, payload || {}, clientIp, userAgent);
+      return res.json({ success: true, event: record });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err?.message || "Event simulation failed" });
+    }
+  });
+
+  app.post("/api/admin/marketing/dismiss-quota-alert", (req, res) => {
+    try {
+      const { alertId } = req.body || {};
+      if (alertId) {
+        serverSideTrackingEngine.dismissAlert(alertId);
+      }
+      return res.json({ success: true, message: "Alert dismissed" });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err?.message });
+    }
+  });
+
+  app.post("/api/admin/marketing/test-quota-threshold", (req, res) => {
+    try {
+      const { resource, simulatedPercent } = req.body || {};
+      const config = serverSideTrackingEngine.getConfig();
+
+      if (resource === 'database') {
+        const quota = config.dbQuotaMB || 500;
+        const simulatedMB = parseFloat(((quota * (simulatedPercent || 85)) / 100).toFixed(1));
+        serverSideTrackingEngine.updateConfig({ dbSimulatedMB: simulatedMB });
+      } else if (resource === 'storage') {
+        const quota = config.storageQuotaMB || 1024;
+        const simulatedMB = parseFloat(((quota * (simulatedPercent || 85)) / 100).toFixed(1));
+        serverSideTrackingEngine.updateConfig({ storageSimulatedMB: simulatedMB });
+      } else if (resource === 'bandwidth') {
+        const quota = config.bandwidthQuotaGB || 50;
+        const simulatedGB = parseFloat(((quota * (simulatedPercent || 85)) / 100).toFixed(1));
+        serverSideTrackingEngine.updateConfig({ bandwidthSimulatedGB: simulatedGB });
+      }
+
+      serverSideTrackingEngine.resetAlerts();
+      const quota = serverSideTrackingEngine.getSupabaseQuotaMetrics();
+      return res.json({ success: true, message: `Threshold simulated for ${resource}`, quota });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err?.message });
+    }
+  });
+
+  app.post("/api/admin/marketing/reset-quota-alerts", (req, res) => {
+    try {
+      serverSideTrackingEngine.updateConfig({
+        dbSimulatedMB: undefined,
+        storageSimulatedMB: undefined,
+        bandwidthSimulatedGB: undefined,
+      });
+      serverSideTrackingEngine.resetAlerts();
+      const quota = serverSideTrackingEngine.getSupabaseQuotaMetrics();
+      return res.json({ success: true, message: "Quota reset to live values", quota });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err?.message });
     }
   });
 

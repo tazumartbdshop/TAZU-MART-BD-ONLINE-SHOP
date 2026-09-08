@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Headset, 
@@ -110,8 +111,11 @@ export function SupportCenter({ isModal = false, onClose }: SupportCenterProps) 
     settings
   } = useSupportStore();
 
+  const [searchParams] = useSearchParams();
+  const initialType = (searchParams.get('type') === 'ai' || searchParams.get('mode') === 'ai') ? 'ai' : null;
+
   // Mode settings
-  const [chatType, setChatType] = useState<'human' | 'ai' | 'ticket_form' | 'ticket_history' | null>(null);
+  const [chatType, setChatType] = useState<'human' | 'ai' | 'ticket_form' | 'ticket_history' | null>(initialType);
   
   // Ticket Form state
   const [ticketCategory, setTicketCategory] = useState('');
@@ -156,8 +160,8 @@ export function SupportCenter({ isModal = false, onClose }: SupportCenterProps) 
     
     // Search in orders store
     const foundOrder = orders.find(o => 
-      o.orderId.toUpperCase() === input || 
-      o.id.toUpperCase() === input ||
+      (o.orderId || '').toUpperCase() === input || 
+      (o.id || '').toUpperCase() === input ||
       o.mobileNumber === input ||
       o.mobileNumber.replace(/[+\s-]+/g, '') === input.replace(/[+\s-]+/g, '')
     );
@@ -319,7 +323,7 @@ export function SupportCenter({ isModal = false, onClose }: SupportCenterProps) 
         {
           id: 'ai-init',
           sender: 'admin',
-          text: `নমস্কার, **${fullName}**! তজু মার্চ **TAZU AI Support**-এ আপনাকে স্বাগতম। \n\nআমি আপনাকে অর্ডার গাইডেন্স, পেমেন্ট ইনফো, শিপিং চার্জ, রিফান্ড রিকোয়েস্ট, ডিসকাউন্ট কুপন কোড এবং স্টোরের অন্যান্য পলিসি জানতে তাৎক্ষণিক সাহায্য করতে পারি। \n\nআপনার যেকোনো জিজ্ঞাসার কথা নিচে টাইপ করুন অথবা নিচের Quick Suggestions ব্যবহার করুন!`,
+          text: `নমস্কার, **${fullName}**! আইওয়াইএবিডি **IYABD AI Support**-এ আপনাকে স্বাগতম। \n\nআমি আপনাকে অর্ডার গাইডেন্স, পেমেন্ট ইনফো, শিপিং চার্জ, রিফান্ড রিকোয়েস্ট, ডিসকাউন্ট কুপন কোড এবং স্টোরের অন্যান্য পলিসি জানতে তাৎক্ষণিক সাহায্য করতে পারি। \n\nআপনার যেকোনো জিজ্ঞাসার কথা নিচে টাইপ করুন অথবা নিচের Quick Suggestions ব্যবহার করুন!`,
           timestamp: new Date().toISOString(),
           seen: true
         }
@@ -397,7 +401,7 @@ export function SupportCenter({ isModal = false, onClose }: SupportCenterProps) 
     }
   };
 
-  // AI Knowledge responder (TAZU AI Support Local engine)
+  // AI Knowledge responder (IYABD AI Support Local engine)
   const executeLocalAIResponse = (queryText: string) => {
     const q = queryText.toLowerCase().trim();
     setIsAiTyping(true);
@@ -421,7 +425,7 @@ export function SupportCenter({ isModal = false, onClose }: SupportCenterProps) 
 
       // 2. Delivery Help
       if (q.includes('delivery') || q.includes('shipping') || q.includes('ডেলিভারি') || q.includes('চার্জ') || q.includes('শিপিং') || q.includes('সময়')) {
-        return `🚚 **তজু মার্ট ডেলিভারি পলিসি ও চার্জসমূহ:**\n\n` +
+        return `🚚 **আইওয়াইএবিডি ডেলিভারি পলিসি ও চার্জসমূহ:**\n\n` +
                `• **ঢাকা সিটি (Inside Dhaka):** চার্জ ৳৬০ টাকা (সময় ১-২ কার্যদিবস)।\n` +
                `• **ঢাকার বাইরে (Outside Dhaka):** চার্জ ৳১২০ টাকা (সময় ৩-৫ কার্যদিবস)।\n` +
                `• **এক্সপ্রেস ডেলিভারি:** ঢাকার ভেতর ২৪ ঘণ্টার মধ্যে হোম ডেলিভারি পাওয়া সম্ভব।\n\n` +
@@ -469,7 +473,7 @@ export function SupportCenter({ isModal = false, onClose }: SupportCenterProps) 
       if (q.includes('product') || q.includes('stock') || q.includes('পণ্য') || q.includes('স্টক') || q.includes('দাম') || q.includes('প্রোডাক্ট')) {
         const topProds = products.slice(0, 5);
         if (topProds.length === 0) {
-          return `🛍️ তজু মার্টের প্রোডাক্ট লিস্টে এই মুহূর্তে কোনো পণ্য তালিকাভুক্ত পাওয়া যায়নি। নতুন পণ্য খুব শীঘ্রই স্টক করা হবে।`;
+          return `🛍️ আইওয়াইএবিডির প্রোডাক্ট লিস্টে এই মুহূর্তে কোনো পণ্য তালিকাভুক্ত পাওয়া যায়নি। নতুন পণ্য খুব শীঘ্রই স্টক করা হবে।`;
         }
 
         let prodText = `🛍️ **আমাদের স্টোরের সেরা কয়েকটি প্রোডাক্ট স্টক ও দামের তালিকা:**\n\n`;
@@ -491,7 +495,7 @@ export function SupportCenter({ isModal = false, onClose }: SupportCenterProps) 
       }
 
       // Default polite responder
-      return `🤖 দুঃখিত, আমি আপনার প্রশ্নটি সঠিকভাবে বুঝতে পারিনি। \n\nআমি তজু মার্টের **Smart AI Assistant**। আমি আপনাকে প্রোডাক্টের দাম ও স্টক, একটিভ ডিসকাউন্ট কুপন কোড, শিপিং ঠিকানা, রিফান্ড বা এক্সচেঞ্জ পলিসি এবং মোবাইল নম্বর **(${mobileNumber})** সংক্রান্ত অর্ডারের সঠিক অবস্থা জানাতে পারবো। অনুগ্রহ করে স্পষ্ট প্রশ্ন করুন!`;
+      return `🤖 দুঃখিত, আমি আপনার প্রশ্নটি সঠিকভাবে বুঝতে পারিনি। \n\nআমি আইওয়াইএবিডির **Smart AI Assistant**। আমি আপনাকে প্রোডাক্টের দাম ও স্টক, একটিভ ডিসকাউন্ট কুপন কোড, শিপিং ঠিকানা, রিফান্ড বা এক্সচেঞ্জ পলিসি এবং মোবাইল নম্বর **(${mobileNumber})** সংক্রান্ত অর্ডারের সঠিক অবস্থা জানাতে পারবো। অনুগ্রহ করে স্পষ্ট প্রশ্ন করুন!`;
     };
 
     setTimeout(() => {
@@ -687,7 +691,7 @@ export function SupportCenter({ isModal = false, onClose }: SupportCenterProps) 
             </div>
             <div>
               <h1 className="text-lg md:text-xl font-black uppercase tracking-wider flex items-center gap-1.5 leading-none">
-                TAZU Support Desk <span className="text-[10px] bg-red-600 text-white font-black px-1.5 py-0.5 rounded tracking-widest uppercase animate-pulse">24/7 LIVE</span>
+                IYABD Support Desk <span className="text-[10px] bg-red-600 text-white font-black px-1.5 py-0.5 rounded tracking-widest uppercase animate-pulse">24/7 LIVE</span>
               </h1>
               <p className="text-[10.5px] text-zinc-400 font-extrabold uppercase mt-1 tracking-widest flex items-center gap-1.5">
                 <span>● Professional Customer Care</span>
@@ -834,11 +838,11 @@ export function SupportCenter({ isModal = false, onClose }: SupportCenterProps) 
                         >
                           <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                             {[
-                              { label: 'Super Admin', email: 'admin@tazumartbd.com' },
-                              { label: 'Moderator Team', email: 'moderator@tazumartbd.com' },
-                              { label: 'Customer Support', email: 'support@tazumartbd.com' },
-                              { label: 'Order Department', email: 'orders@tazumartbd.com' },
-                              { label: 'Accounts Department', email: 'accounts@tazumartbd.com' }
+                              { label: 'Super Admin', email: 'admin@iyabd.com' },
+                              { label: 'Moderator Team', email: 'moderator@iyabd.com' },
+                              { label: 'Customer Support', email: 'support@iyabd.com' },
+                              { label: 'Order Department', email: 'orders@iyabd.com' },
+                              { label: 'Accounts Department', email: 'accounts@iyabd.com' }
                             ].map((item, idx) => (
                               <a 
                                 key={idx}
@@ -1292,7 +1296,7 @@ export function SupportCenter({ isModal = false, onClose }: SupportCenterProps) 
                     {chatType === 'human' ? <Headset className="w-6 h-6" /> : <Bot className="w-6 h-6" />}
                   </div>
                   <h3 className="text-sm font-black uppercase tracking-widest text-slate-950">
-                    {chatType === 'human' ? 'Fill Verification for Human support' : 'Initialize Tazu AI Support'}
+                    {chatType === 'human' ? 'Fill Verification for Human support' : 'Initialize IYABD AI Support'}
                   </h3>
                   <p className="text-[11px] text-zinc-400 font-bold uppercase tracking-wide">
                     Please provide your authentic details to retrieve database logs automatically.
@@ -1379,7 +1383,7 @@ export function SupportCenter({ isModal = false, onClose }: SupportCenterProps) 
                     </div>
                     <div className="text-left">
                       <h3 className="text-sm font-black uppercase text-slate-950 leading-none tracking-tight">
-                        {chatType === 'human' ? 'Support Agent' : 'TAZU AI Assistant'}
+                        {chatType === 'human' ? 'Support Agent' : 'IYABD AI Assistant'}
                       </h3>
                       <div className="flex items-center gap-2 mt-1.5">
                         <span className="flex items-center gap-1 text-[10px] text-emerald-600 font-black uppercase tracking-widest">
@@ -1433,7 +1437,7 @@ export function SupportCenter({ isModal = false, onClose }: SupportCenterProps) 
 
                   {filteredMessages.map((msg) => {
                     const isSelf = msg.sender === 'customer';
-                    const senderLabel = isSelf ? (user?.name || fullName) : (chatType === 'human' ? 'Support Agent' : 'TAZU AI Assistant');
+                    const senderLabel = isSelf ? (user?.name || fullName) : (chatType === 'human' ? 'Support Agent' : 'IYABD AI Assistant');
                     const avatarUrl = isSelf 
                       ? user?.profileImage 
                       : (chatType === 'human' ? 'https://api.dicebear.com/7.x/avataaars/svg?seed=Felix' : undefined);
@@ -1500,7 +1504,7 @@ export function SupportCenter({ isModal = false, onClose }: SupportCenterProps) 
                   {isAiTyping && (
                     <div className="flex justify-start items-center gap-2 text-zinc-400 text-[10px] font-mono px-2">
                       <RefreshCw className="w-3 h-3 animate-spin text-amber-500" />
-                      TAZU AI is matching order status and database rows...
+                      IYABD AI is matching order status and database rows...
                     </div>
                   )}
 

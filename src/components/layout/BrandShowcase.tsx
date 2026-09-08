@@ -72,7 +72,7 @@ export function BrandShowcase() {
     return (
       <div className="w-full bg-[#111111] text-white py-14 flex flex-col items-center justify-center border-t border-zinc-800">
         <h2 className="text-3xl md:text-5xl font-black uppercase tracking-[0.25em] text-center px-4 font-sans text-transparent bg-clip-text bg-gradient-to-r from-white via-zinc-400 to-zinc-600">
-          {companyName || 'TAZU MART'}
+          {companyName || 'IYABD'}
         </h2>
         <p className="text-[10px] md:text-xs font-bold uppercase tracking-[0.3em] text-zinc-400 mt-3 text-center px-4">
           {companySubtext || 'Premium Ecommerce Platform'}
@@ -232,7 +232,7 @@ export function BrandShowcase() {
         {/* Company Branding Typography */}
         <div className="mt-8 flex flex-col items-center text-center">
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-black uppercase tracking-[0.25em] text-white">
-            {companyName || 'TAZU MART'}
+            {companyName || 'IYABD'}
           </h2>
           <div className="w-20 h-[2px] bg-purple-600 mt-3 mb-2.5 rounded-full" />
           <p className="text-[10px] md:text-xs font-extrabold uppercase tracking-[0.3em] text-zinc-400">

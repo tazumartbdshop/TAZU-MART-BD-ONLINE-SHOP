@@ -344,7 +344,7 @@ export default function ProductReviews() {
             <h2 className="text-2xl font-black uppercase tracking-widest text-zinc-950">Ratings & Reviews</h2>
             <div className="flex items-center gap-2">
               <span className="text-[10px] bg-zinc-900 text-white px-3 py-1 font-black uppercase tracking-widest rounded-none">
-                {settings.storeName ? `${settings.storeName.trim().toUpperCase()} QUALITY VERIFIED` : 'TAZU MART QUALITY VERIFIED'}
+                {settings.storeName ? `${settings.storeName.trim().toUpperCase()} QUALITY VERIFIED` : 'IYABD QUALITY VERIFIED'}
               </span>
             </div>
           </div>
@@ -604,7 +604,7 @@ export default function ProductReviews() {
                       <div className="mt-4 p-4 bg-zinc-50 text-zinc-900 border border-zinc-200/60 rounded-xl relative">
                          <div className="flex items-center gap-1.5 text-[8px] text-zinc-500 font-extrabold tracking-widest uppercase border-b border-zinc-100 pb-1.5 mb-2.5 whitespace-nowrap">
                             <span className="w-4 h-4 bg-purple-600 text-white font-serif rounded-full flex items-center justify-center text-[7px] font-black shrink-0">T</span>
-                            <span className="font-sans font-black tracking-wider text-zinc-700">TAZU MART BD</span>
+                            <span className="font-sans font-black tracking-wider text-zinc-700">IYABD</span>
                             <span className="text-[6.5px] bg-purple-950 text-purple-300 border border-purple-800/40 px-1.5 py-0.5 rounded font-black uppercase ml-auto">Official Response</span>
                          </div>
                          <p className="text-xs text-zinc-700 font-bold leading-relaxed">{review.adminReply}</p>
@@ -659,7 +659,7 @@ export default function ProductReviews() {
               <div className="p-6 border-b border-zinc-100 flex items-center justify-between bg-white relative z-10">
                 <div>
                   <h3 className="text-sm font-black uppercase tracking-widest text-[#000000]">Post Product Review</h3>
-                  <p className="text-[10px] text-zinc-400 font-bold mt-1 uppercase">Share your honest feedback on Tazu Mart</p>
+                  <p className="text-[10px] text-zinc-400 font-bold mt-1 uppercase">Share your honest feedback on IYABD</p>
                 </div>
                 <button 
                   onClick={() => !isSubmitting && setIsReviewModalOpen(false)}

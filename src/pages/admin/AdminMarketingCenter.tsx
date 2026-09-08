@@ -250,7 +250,7 @@ const INITIAL_MARKETING_CONFIG: MarketingCenterConfig = {
     conversionApiToken: 'capi_token_fb_120893120381028390',
     testEventCode: 'TEST90831',
     domainVerificationStatus: 'Verified',
-    domainVerification: 'tazumart.com-fb-verify-91zobpq83',
+    domainVerification: 'iyabd.com-fb-verify-91zobpq83',
     metaBusinessId: 'MB-100238129',
     businessPortfolioId: 'BP-881290382',
     adAccountId: 'ACT-90218932',
@@ -351,10 +351,10 @@ const INITIAL_MARKETING_CONFIG: MarketingCenterConfig = {
   },
   serverSide: {
     active: true,
-    endpointUrl: 'https://ss-capi.tazumart.com/v1/collect',
+    endpointUrl: 'https://ss-capi.iyabd.com/v1/collect',
     trackingToken: 'ss_tok_ef48a901f4cb3b4aef9b2eb8c1507d',
     verificationKey: 'ev_key_88cb3b4aef9',
-    hmacSecretKey: 'hmac_tazu_sec_90812390812abc',
+    hmacSecretKey: 'hmac_iyabd_sec_90812390812abc',
     retryQueueStatus: '0 Pending (Healthy)',
     integrations: {
       facebookCapi: true,
@@ -381,7 +381,7 @@ const INITIAL_MARKETING_CONFIG: MarketingCenterConfig = {
     autoProductFeedUpdate: true,
     feedValidation: true,
     lastSyncTime: '2026-05-29 12:00:15',
-    feedUrl: 'https://tazumart.com/api/catalog/feed.xml',
+    feedUrl: 'https://iyabd.com/api/catalog/feed.xml',
     syncInterval: 'Every 6 Hours'
   },
   audience: {
@@ -457,7 +457,7 @@ export default function AdminMarketingCenter() {
 
   // Loading data from localStorage
   useEffect(() => {
-    const saved = localStorage.getItem('tazumart_marketing_center_config_v2');
+    const saved = localStorage.getItem('iyabd_marketing_center_config_v2');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
@@ -524,7 +524,7 @@ export default function AdminMarketingCenter() {
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    localStorage.setItem('tazumart_marketing_center_config_v2', JSON.stringify(config));
+    localStorage.setItem('iyabd_marketing_center_config_v2', JSON.stringify(config));
     setIsSaved(true);
     setTimeout(() => setIsSaved(false), 3050);
   };
@@ -1478,12 +1478,12 @@ export default function AdminMarketingCenter() {
                     <div className="flex-1 mr-4 overflow-hidden text-ellipsis whitespace-nowrap">
                        <span className="text-[8.5px] font-black text-zinc-400 block uppercase mb-1">Calculated Campaign Target Destination URL</span>
                        <span className="font-mono text-zinc-700 select-all font-semibold">
-                          {`https://tazumart.com/?utm_source=${config.websiteTracking.utm.source}&utm_medium=${config.websiteTracking.utm.medium}&utm_campaign=${config.websiteTracking.utm.campaign}&utm_content=${config.websiteTracking.utm.content}&utm_term=${config.websiteTracking.utm.term}`}
+                          {`https://iyabd.com/?utm_source=${config.websiteTracking.utm.source}&utm_medium=${config.websiteTracking.utm.medium}&utm_campaign=${config.websiteTracking.utm.campaign}&utm_content=${config.websiteTracking.utm.content}&utm_term=${config.websiteTracking.utm.term}`}
                        </span>
                     </div>
                     <button 
                       type="button"
-                      onClick={() => handleCopy(`https://tazumart.com/?utm_source=${config.websiteTracking.utm.source}&utm_medium=${config.websiteTracking.utm.medium}&utm_campaign=${config.websiteTracking.utm.campaign}&utm_content=${config.websiteTracking.utm.content}&utm_term=${config.websiteTracking.utm.term}`, 'utm')}
+                      onClick={() => handleCopy(`https://iyabd.com/?utm_source=${config.websiteTracking.utm.source}&utm_medium=${config.websiteTracking.utm.medium}&utm_campaign=${config.websiteTracking.utm.campaign}&utm_content=${config.websiteTracking.utm.content}&utm_term=${config.websiteTracking.utm.term}`, 'utm')}
                       className="px-3 py-1.5 bg-black text-white text-[9px] font-black uppercase tracking-wider rounded"
                     >
                        Copy URL
@@ -1623,7 +1623,7 @@ export default function AdminMarketingCenter() {
               <div className="bg-white p-5 rounded-[8px] border border-zinc-200 shadow-xs space-y-4">
                  <div>
                     <h3 className="text-xs font-black uppercase tracking-widest text-zinc-950">Active CAPI Server Events</h3>
-                    <p className="text-[9px] text-zinc-400 font-bold uppercase mt-1">Conversions triggered directly within Tazumart backend routers</p>
+                    <p className="text-[9px] text-zinc-400 font-bold uppercase mt-1">Conversions triggered directly within IYABD backend routers</p>
                  </div>
                  <hr className="border-zinc-100" />
                  <div className="space-y-2 font-medium">
@@ -1746,7 +1746,7 @@ export default function AdminMarketingCenter() {
                       type="text" 
                       value={inputFeedProduct}
                       onChange={(e) => setInputFeedProduct(e.target.value)}
-                      placeholder="Insert Tazumart Product Slug URL to test (e.g., premium-punjabi-cotton)"
+                      placeholder="Insert IYABD Product Slug URL to test (e.g., premium-punjabi-cotton)"
                       className="flex-1 px-3 py-2 border border-zinc-200 rounded-[6px] text-xs focus:outline-none focus:border-black font-semibold"
                     />
                     <button 
@@ -2160,7 +2160,7 @@ export default function AdminMarketingCenter() {
                     [OK] Checking browser-side cookies for standard PageView sequences.
                     [OK] Verification token matched for Facebook Conversions API.
                     [WARN] Custom payload warning: GAds conversions label AW-110283918-X purchase tag should be double audited.
-                    [PING] Ping diagnostics successfully returned 200 OK from server endpoint: ss-capi.tazumart.com.
+                    [PING] Ping diagnostics successfully returned 200 OK from server endpoint: ss-capi.iyabd.com.
                  </div>
               </div>
 
@@ -2170,7 +2170,7 @@ export default function AdminMarketingCenter() {
 
       {/* FOOTER */}
       <div className="p-5 bg-white border border-zinc-200 rounded-[8px] flex flex-col md:flex-row justify-between items-center text-[10.5px] text-zinc-400 font-extrabold uppercase tracking-wide gap-3">
-         <span>© 2026 Tazumart Inc. Enterprise Integration Framework.</span>
+         <span>© 2026 IYABD Inc. Enterprise Integration Framework.</span>
          <div className="flex gap-4">
             <span className="text-zinc-650 hover:text-black cursor-help">Technical API Manual</span>
             <span className="text-zinc-650 hover:text-black cursor-help">Cookie Privacy Declarations</span>

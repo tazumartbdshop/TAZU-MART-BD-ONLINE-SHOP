@@ -45,7 +45,7 @@ const ALL_FALLBACK_PRODUCTS = [
     rating: 4.9,
     reviews: 380,
     isNew: true,
-    brand: 'Tazu Executive',
+    brand: 'IYABD Executive',
     status: 'active',
     description: 'Designed for the bold, this Skeleton automatic winding timepiece showcases a sophisticated mechanical watch face inside a premium stealth-coated casing. Finished with a breathable genuine leather wrap.',
     createdAt: Date.now(),
@@ -99,7 +99,7 @@ const ALL_FALLBACK_PRODUCTS = [
     rating: 5.0,
     reviews: 150,
     isNew: false,
-    brand: 'Tazu Chrono',
+    brand: 'IYABD Chrono',
     status: 'active',
     description: 'Classic brushed silver styling featuring premium Japanese-engineered multi-function chronograph movement. High structural resistance sapphire crystal glass ensures absolute dust and water sealing.',
     createdAt: Date.now(),
@@ -180,7 +180,7 @@ const ALL_FALLBACK_PRODUCTS = [
     rating: 4.9,
     reviews: 65,
     isNew: true,
-    brand: 'Tazu Executive',
+    brand: 'IYABD Executive',
     status: 'active',
     description: 'Uncompromising presidential edition watch showcasing a delicate gold-woven mesh bracelet with minimalist dark face. Complements elegant evening attire with sublime grace.',
     createdAt: Date.now(),
@@ -191,7 +191,7 @@ const ALL_FALLBACK_PRODUCTS = [
   },
   {
     id: 'fn-3',
-    name: 'Tazu Executive Gift Dual Pen & Watch Set',
+    name: 'IYABD Executive Gift Dual Pen & Watch Set',
     sku: 'ACC-W091-BD7',
     category: 'Gift Set',
     price: 9500,
@@ -206,7 +206,7 @@ const ALL_FALLBACK_PRODUCTS = [
     rating: 5.0,
     reviews: 45,
     isNew: true,
-    brand: 'Tazu Executive',
+    brand: 'IYABD Executive',
     status: 'active',
     description: 'Curated premium set including an executive rollerball ink pen paired beautifully with a matching modern quartz timepiece. Presented inside an expensive velvet presentation box.',
     createdAt: Date.now(),
@@ -290,16 +290,16 @@ export default function Product() {
       "@type": "Product",
       "name": product.name,
       "image": prodImg ? [prodImg] : [],
-      "description": product.description || `${product.name} - Best authentic price in Bangladesh with cash on delivery from TAZU MART BD.`,
+      "description": product.description || `${product.name} - Best authentic price in Bangladesh with cash on delivery from IYABD.`,
       "sku": product.sku || product.id,
       "brand": {
         "@type": "Brand",
-        "name": product.brand || "TAZU MART BD"
+        "name": product.brand || "IYABD"
       },
       "category": product.category || "Accessories",
       "offers": {
         "@type": "Offer",
-        "url": `https://tazumartbd.com/product/${product.slug || product.id}`,
+        "url": `https://iyabd.com/product/${product.slug || product.id}`,
         "priceCurrency": "BDT",
         "price": String(finalPrice),
         "priceValidUntil": "2027-12-31",
@@ -307,8 +307,8 @@ export default function Product() {
         "availability": "https://schema.org/InStock",
         "seller": {
           "@type": "Organization",
-          "name": "TAZU MART BD",
-          "url": "https://tazumartbd.com"
+          "name": "IYABD",
+          "url": "https://iyabd.com"
         }
       },
       ...(showRating && liveReviewsCount > 0 ? {
@@ -322,13 +322,13 @@ export default function Product() {
   }, [product, liveAverageRating, liveReviewsCount, showRating]);
 
   useDynamicSEO({
-    title: product ? `${product.name} | Best Price in Bangladesh` : 'Product Details | TAZU MART BD',
+    title: product ? `${product.name} | Best Price in Bangladesh` : 'Product Details | IYABD',
     description: product?.description ? `${product.description.substring(0, 150)}... Buy at ৳${product.discountPrice || product.price} with fast home delivery across Bangladesh.` : undefined,
     canonicalUrl: product ? `/product/${product.slug || product.id}` : undefined,
     ogImage: product?.image || (product?.images && product.images[0]),
     ogType: 'product',
     jsonLd,
-    keywords: product ? [product.name, product.category, 'TAZU MART BD', 'Buy Online Bangladesh', 'Cash on Delivery'].filter(Boolean) as string[] : undefined
+    keywords: product ? [product.name, product.category, 'IYABD', 'Buy Online Bangladesh', 'Cash on Delivery'].filter(Boolean) as string[] : undefined
   });
   
   const bannerUrls = useMemo(() => {
@@ -1346,12 +1346,12 @@ export default function Product() {
                   )}
                 </div>
 
-                {/* Tazu Coins Label */}
+                {/* IYABD Coins Label */}
                 {(product.coin_enabled ?? true) && (
                   <div className="flex items-center gap-2 bg-orange-100/50 px-3 py-1.5 rounded-full border border-orange-200">
                     <span className="text-[14px]">🪙</span>
                     <span className="text-[11px] font-black uppercase text-orange-700 tracking-tight">
-                      {(product.reward_coins || 250) * quantity} Tazu Coins
+                      {(product.reward_coins || 250) * quantity} IYABD Coins
                     </span>
                   </div>
                 )}

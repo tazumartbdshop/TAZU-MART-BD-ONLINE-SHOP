@@ -224,7 +224,7 @@ export default function HostingerMysqlManager() {
             </label>
             <input
               type="text"
-              placeholder="e.g. u123456789_tazu"
+              placeholder="e.g. u123456789_iyabd"
               value={formData.database}
               onChange={e => setFormData({ ...formData, database: e.target.value })}
               className="w-full h-11 px-3 border border-zinc-300 focus:border-black focus:outline-none text-xs font-mono"

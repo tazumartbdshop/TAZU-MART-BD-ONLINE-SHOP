@@ -52,7 +52,7 @@ export default function OrderHistoryPage() {
   const filteredOrders = useMemo(() => {
     if (!status || status === 'all') return myOrders;
 
-    const targetStatus = status.toLowerCase();
+    const targetStatus = (status || '').toLowerCase();
 
     return myOrders.filter(o => {
       const s = (o.status || '').toLowerCase();

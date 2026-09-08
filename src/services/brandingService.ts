@@ -62,12 +62,12 @@ export const DEFAULT_BRANDING_SETTINGS: BrandingSettings = {
   site_short_name: '',
   site_tagline: '',
 
-  primary_logo: '',
-  secondary_logo: '',
-  favicon: '',
-  apple_touch_icon: '',
-  mobile_logo: '',
-  desktop_logo: '',
+  primary_logo: '/logo.png',
+  secondary_logo: '/logo.png',
+  favicon: '/favicon.ico',
+  apple_touch_icon: '/apple-touch-icon.png',
+  mobile_logo: '/logo.png',
+  desktop_logo: '/logo.png',
   dark_logo: '',
   light_logo: '',
   footer_logo: '',
@@ -82,7 +82,7 @@ export const DEFAULT_BRANDING_SETTINGS: BrandingSettings = {
   default_profile_image: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&auto=format&fit=crop&q=80',
   male_profile_image: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&auto=format&fit=crop&q=80',
   female_profile_image: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&auto=format&fit=crop&q=80',
-  login_banner: 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=1200&auto=format&fit=crop&q=80',
+  login_banner: '/auth-banner.webp',
   default_store_banner: '',
   default_category_banner: '',
   default_product_image: '',
@@ -113,7 +113,15 @@ export const brandingService = {
     try {
       const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
       if (saved) {
-        return { ...DEFAULT_BRANDING_SETTINGS, ...JSON.parse(saved) };
+        const parsed = JSON.parse(saved);
+        return { 
+          ...DEFAULT_BRANDING_SETTINGS, 
+          ...parsed,
+          primary_logo: parsed.primary_logo || '/logo.png',
+          desktop_logo: parsed.desktop_logo || '/logo.png',
+          mobile_logo: parsed.mobile_logo || '/logo.png',
+          login_banner: parsed.login_banner || '/auth-banner.webp'
+        };
       }
     } catch (e) {
       console.warn("localStorage fallback parse failed:", e);

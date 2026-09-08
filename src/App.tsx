@@ -17,7 +17,6 @@ import { useBannerStore } from './store/useBannerStore';
 import { useMenuSortStore } from './store/useMenuSortStore';
 import { useDeliveryStore } from './store/useDeliveryStore';
 import { broadcastSync } from './lib/broadcastSync';
-import { CookieConsentBanner } from './components/common/CookieConsentBanner';
 import Home from './pages/Home';
 import Cart from './pages/Cart';
 import Checkout from './pages/Checkout';
@@ -44,6 +43,7 @@ import ReviewDetails from './pages/ReviewDetails';
 import Support from './pages/Support';
 import Offers from './pages/Offers';
 import CampaignProductsPage from './pages/CampaignProductsPage';
+import { campaignService } from './services/campaignService';
 import Games from './pages/Games';
 import DeliveryPoints from './pages/DeliveryPoints';
 import { ThemeInitializer } from './ThemeInitializer';
@@ -131,6 +131,7 @@ export default function App() {
     const unsubSettings = useSettingsStore.getState().subscribe();
     const unsubTheme = useThemeStore.getState().subscribe();
     const unsubOffers = useOfferStore.getState().subscribe();
+    campaignService.preloadActiveCampaigns();
     const unsubCustomers = useCustomerStore.getState().subscribe();
     const unsubBrands = useBrandShowcaseStore.getState().subscribe();
     const unsubModerators = useModeratorStore.getState().subscribe();
@@ -196,7 +197,6 @@ export default function App() {
     <Router>
       <AnalyticsRouteListener />
       <Toaster />
-      <CookieConsentBanner />
       <ThemeInitializer />
       <RuntimeDiagnostics />
       <Routes>

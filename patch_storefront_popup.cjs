@@ -18,7 +18,7 @@ export function StorefrontPopup() {
 
   useEffect(() => {
     // Only show once per session ideally, but for testing we can show it on mount
-    const hasSeen = sessionStorage.getItem('tazumart_campaigns_seen');
+    const hasSeen = sessionStorage.getItem('iyabd_campaigns_seen');
     if (!hasSeen) {
       campaignService.getActiveCampaigns().then(data => {
         if (data.length > 0) {
@@ -52,7 +52,7 @@ export function StorefrontPopup() {
 
   const handleClose = () => {
     setIsOpen(false);
-    sessionStorage.setItem('tazumart_campaigns_seen', 'true');
+    sessionStorage.setItem('iyabd_campaigns_seen', 'true');
   };
 
   const handleView = () => {

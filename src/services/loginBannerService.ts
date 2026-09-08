@@ -22,7 +22,7 @@ export const loginBannerService = {
     } catch (e) {
       console.warn('LocalStorage error reading login banner cache:', e);
     }
-    return '';
+    return '/auth-banner.webp';
   },
 
   setFallbackBanner(url: string) {

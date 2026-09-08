@@ -741,7 +741,7 @@ export const useOrderStore = create<OrderState>((set, get) => ({
         id: Math.random().toString(36).substring(2, 9),
         user_id: orderData.user_id,
         title: `Refund ${status}`,
-        message: `Your refund request for Order #${orderData.order_id} has been ${status.toLowerCase()}.`,
+        message: `Your refund request for Order #${orderData.order_id} has been ${(status || '').toLowerCase()}.`,
         type: 'refund',
         created_at: now
       }]);

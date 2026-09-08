@@ -163,7 +163,7 @@ export default function AdminOrdersCardView() {
 
     const profileImage = matched?.profileImage || order.customerImage || null;
     const displayName = order.customerName || matched?.name || 'Customer';
-    const firstLetter = displayName.trim().charAt(0).toUpperCase() || 'C';
+    const firstLetter = (displayName || 'C').trim().charAt(0).toUpperCase() || 'C';
 
     return {
       matchedCustomer: matched,

@@ -995,7 +995,7 @@ export default function AdminSupport() {
                      <div className="space-y-3 pb-4 border-b border-gray-150">
                         <div className="flex items-center gap-3">
                            <div className="w-12 h-12 bg-slate-900 rounded-2xl flex items-center justify-center text-white text-lg font-black shrink-0">
-                              {currentChat.customerName?.[0]?.toUpperCase() || 'C'}
+                              {(currentChat?.customerName || 'C')[0]?.toUpperCase() || 'C'}
                            </div>
                            <div className="overflow-hidden">
                               <h3 className="text-sm font-black text-gray-950 truncate uppercase">{currentChat.customerName}</h3>
@@ -1131,7 +1131,7 @@ export default function AdminSupport() {
                             const modStr = currentChat.assignedModerator ? '\nAssigned Moderator: ' + currentChat.assignedModerator : '';
                             let log = 'TAZU MART SUPPORT CHAT EXTRACT LOGGER\n======================================\nSession ID: ' + currentChat.id + '\nCustomer Name: ' + currentChat.customerName + '\nCustomer Phone: ' + currentChat.customerPhone + '\nSession Status: ' + currentChat.status + modStr + notesStr + '\n\nCHAT STREAM MESSAGES:\n---------------------\n';
                             currentChat.messages.forEach(m => {
-                              log += '[' + new Date(m.timestamp).toLocaleString() + '] ' + m.sender.toUpperCase() + ': ' + (m.text || '[Attachment/Media]') + '\n';
+                              log += '[' + new Date(m.timestamp).toLocaleString() + '] ' + (m.sender || '').toUpperCase() + ': ' + (m.text || '[Attachment/Media]') + '\n';
                             });
                             const blob = new Blob([log], { type: 'text/plain;charset=utf-8' });
                             const url = URL.createObjectURL(blob);

@@ -636,7 +636,7 @@ export default function AdminPushNotifications({ activeTab: initialTab = 'create
                   <div className="flex items-center justify-between text-[9px] font-bold text-slate-400 border-b border-slate-800/80 pb-1.5">
                     <span className="flex items-center gap-1 text-slate-300">
                       <Bell className="w-3 h-3 text-amber-400" />
-                      <span>{settings.storeName || 'TAZU'} App</span>
+                      <span>{settings.storeName || 'IYABD'} App</span>
                     </span>
                     <span>Just Now</span>
                   </div>

@@ -40,6 +40,46 @@ export interface Coupon {
 let useFallback = false;
 let checkDone = false;
 
+const CACHE_KEY = 'tazu_cached_active_campaigns';
+const OFFERS_BANNER_CACHE_KEY = 'tazu_cached_offers_banner';
+
+let inMemoryActiveCampaigns: (Campaign & { products: string[], categories: string[], coupon?: Coupon })[] | null = null;
+let inMemoryOffersBanner: string | null = null;
+let isPreloading = false;
+
+// Preload images into browser memory/disk cache
+export const prefetchImages = (urls: (string | undefined | null)[]) => {
+  if (typeof window === 'undefined') return;
+  urls.filter(Boolean).forEach(url => {
+    if (!url) return;
+    try {
+      const img = new Image();
+      img.src = url;
+    } catch {
+      // ignore
+    }
+  });
+};
+
+const DEFAULT_FALLBACK_CAMPAIGNS: (Campaign & { products: string[], categories: string[], coupon?: Coupon })[] = [
+  {
+    id: 'default-active-campaign-1',
+    title: 'Special Discount Offer',
+    description: 'Exclusive seasonal discount vouchers and promotional deals',
+    image_url: '/offer.png',
+    status: 'active' as const,
+    products: [],
+    categories: [],
+    coupon: {
+      code: 'OFFER10',
+      discount_type: 'Percentage' as const,
+      discount_value: 10,
+      active: true
+    },
+    created_at: new Date().toISOString()
+  }
+];
+
 async function ensureDBSetup() {
   if (checkDone) return;
   const db = getDb();
@@ -64,6 +104,53 @@ async function saveFallbackData(campaigns: any[]) {
 }
 
 export const campaignService = {
+  getCachedActiveCampaigns(): (Campaign & { products: string[], categories: string[], coupon?: Coupon })[] {
+    if (inMemoryActiveCampaigns && inMemoryActiveCampaigns.length > 0) {
+      return inMemoryActiveCampaigns;
+    }
+    try {
+      const cached = localStorage.getItem(CACHE_KEY);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          inMemoryActiveCampaigns = parsed;
+          return parsed;
+        }
+      }
+    } catch (e) {
+      console.warn("Failed to parse cached active campaigns:", e);
+    }
+    return DEFAULT_FALLBACK_CAMPAIGNS;
+  },
+
+  getCachedOffersBanner(): string {
+    if (inMemoryOffersBanner) return inMemoryOffersBanner;
+    try {
+      const cached = localStorage.getItem(OFFERS_BANNER_CACHE_KEY);
+      if (cached) {
+        inMemoryOffersBanner = cached;
+        return cached;
+      }
+    } catch {}
+    return '';
+  },
+
+  async preloadActiveCampaigns(): Promise<(Campaign & { products: string[], categories: string[], coupon?: Coupon })[]> {
+    if (isPreloading) {
+      return inMemoryActiveCampaigns || this.getCachedActiveCampaigns();
+    }
+    isPreloading = true;
+    try {
+      const data = await this.getActiveCampaigns();
+      return data;
+    } catch (err) {
+      console.warn("Background preloadActiveCampaigns notice:", err);
+      return inMemoryActiveCampaigns || this.getCachedActiveCampaigns();
+    } finally {
+      isPreloading = false;
+    }
+  },
+
   async getCampaigns(): Promise<Campaign[]> {
     await ensureDBSetup();
     const db = getDb();
@@ -173,7 +260,36 @@ export const campaignService = {
       }
     }
 
-    return Array.from(uniqueMap.values());
+    const result = Array.from(uniqueMap.values()) as (Campaign & { products: string[], categories: string[], coupon?: Coupon })[];
+    result.sort((a, b) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime());
+
+    // Update in-memory & localStorage cache
+    if (result.length > 0) {
+      inMemoryActiveCampaigns = result;
+      try {
+        localStorage.setItem(CACHE_KEY, JSON.stringify(result));
+      } catch (e) {}
+
+      // Pre-cache all campaign images directly into browser cache
+      prefetchImages(result.map(c => c.image_url));
+    }
+
+    // Also fetch & cache offers_page_banner in background
+    try {
+      if (db) {
+        db.from('settings').select('imageUrl').eq('id', 'offers_page_banner').limit(1).then(({ data: bData }) => {
+          if (bData && bData.length > 0 && bData[0].imageUrl) {
+            inMemoryOffersBanner = bData[0].imageUrl;
+            try {
+              localStorage.setItem(OFFERS_BANNER_CACHE_KEY, bData[0].imageUrl);
+            } catch {}
+            prefetchImages([bData[0].imageUrl]);
+          }
+        });
+      }
+    } catch {}
+
+    return result.length > 0 ? result : (inMemoryActiveCampaigns || DEFAULT_FALLBACK_CAMPAIGNS);
   },
 
   async createCampaign(campaign: Omit<Campaign, 'id'>, productIds: string[], categoryIds: string[], coupon?: Omit<Coupon, 'campaign_id'>) {

@@ -236,6 +236,7 @@ const defaultSettings: AppSettings = {
   businessType: '',
   storeTagline: '',
   storeDescription: '',
+  storeLogo: '/logo.png',
 
   primaryColor: '#000000',
   secondaryColor: '#666666',
@@ -478,7 +479,12 @@ const getInitialSettings = (): AppSettings => {
   try {
     const saved = localStorage.getItem('tazu_settings_cache');
     if (saved) {
-      return { ...defaultSettings, ...JSON.parse(saved) };
+      const parsed = JSON.parse(saved);
+      return { 
+        ...defaultSettings, 
+        ...parsed, 
+        storeLogo: parsed.storeLogo || '/logo.png' 
+      };
     }
   } catch (e) {
     console.warn("Could not read settings cache", e);

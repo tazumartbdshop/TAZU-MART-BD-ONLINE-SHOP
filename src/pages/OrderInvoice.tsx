@@ -13,7 +13,7 @@ export default function OrderInvoice() {
 
   if (!order) {
     try {
-      const stored = localStorage.getItem('tazu_last_placed_order');
+      const stored = localStorage.getItem('iyabd_last_placed_order');
       if (stored) {
         const parsed = JSON.parse(stored);
         if (parsed && (parsed.orderId === orderId || parsed.id === orderId || !orderId)) {
@@ -30,7 +30,7 @@ export default function OrderInvoice() {
     orderId: orderId || '892341',
     customerName: 'Valued Customer',
     mobileNumber: '+880 1314 541738',
-    email: 'customer@tazumartbd.com',
+    email: 'customer@iyabd.com',
     fullAddress: 'House #12, Road #4, Sector #7, Uttara, Dhaka',
     cityArea: 'Dhaka',
     postalCode: '1230',

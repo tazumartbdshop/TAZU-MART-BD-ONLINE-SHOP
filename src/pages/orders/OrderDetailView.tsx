@@ -93,7 +93,7 @@ export default function OrderDetailView() {
   };
 
   const currentStepIdx = getStepIndex(order.status);
-  const isCancelled = order.status.toLowerCase() === 'cancelled';
+  const isCancelled = (order.status || '').toLowerCase() === 'cancelled';
 
   const handleRefund = async () => {
     if (!refundReason.trim()) {

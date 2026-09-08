@@ -302,7 +302,7 @@ export default function AdminBanners() {
         }
 
         setSaveStatus('saved');
-        toast.success(`Banner (${bannerTypeVal.toUpperCase().replace('_', ' ')}) updated successfully!`);
+        toast.success(`Banner (${(bannerTypeVal || '').toUpperCase().replace('_', ' ')}) updated successfully!`);
         setIsDirty(false);
         setTimeout(() => navigate('/admin/banner/list'), 1500);
       } catch (err: any) {
@@ -541,7 +541,7 @@ export default function AdminBanners() {
           console.warn("Account character upload API sync note:", apiE);
         }
 
-        toast.success(`✅ ${slot.toUpperCase()} Character updated successfully!`);
+        toast.success(`✅ ${(slot || '').toUpperCase()} Character updated successfully!`);
       }
     } catch (err: any) {
       console.error(`Failed to upload ${slot} character:`, err);
@@ -586,7 +586,7 @@ export default function AdminBanners() {
         });
       } catch (apiE) {}
 
-      toast.success(`Reset ${slot.toUpperCase()} to standard avatar`);
+      toast.success(`Reset ${(slot || '').toUpperCase()} to standard avatar`);
     } catch (e) {
       toast.error("Failed to reset slot");
     }
@@ -796,7 +796,7 @@ export default function AdminBanners() {
               <div className="pt-3 border-t border-zinc-100">
                 <div className="flex items-center justify-between text-[8px] font-black text-zinc-400 uppercase tracking-widest mb-2">
                   <span>Selected Images ({localPreviews.length})</span>
-                  <span>Target: {bannerCategory.toUpperCase()} BANNER</span>
+                  <span>Target: {(bannerCategory || '').toUpperCase()} BANNER</span>
                 </div>
                 <div className="flex gap-3 overflow-x-auto pb-2">
                   {localPreviews.map((preview, index) => (

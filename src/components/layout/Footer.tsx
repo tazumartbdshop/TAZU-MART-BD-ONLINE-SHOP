@@ -19,9 +19,9 @@ export function Footer() {
       }
     };
 
-    window.addEventListener('tazu-footer-updated', handleLiveUpdate);
+    window.addEventListener('iyabd-footer-updated', handleLiveUpdate);
     return () => {
-      window.removeEventListener('tazu-footer-updated', handleLiveUpdate);
+      window.removeEventListener('iyabd-footer-updated', handleLiveUpdate);
     };
   }, []);
 
@@ -54,7 +54,7 @@ export function Footer() {
                 />
               )}
               <h2 className="text-xl font-black tracking-tight text-zinc-900">
-                {settings.companyName || 'TAZU MART'}
+                {settings.companyName || 'IYABD'}
               </h2>
             </div>
             

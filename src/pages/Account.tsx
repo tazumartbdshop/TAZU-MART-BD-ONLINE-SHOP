@@ -125,9 +125,9 @@ export default function Account() {
     if (!activeFilter) return userOrders;
     const item = darazStatusItems.find(i => i.label === activeFilter);
     if (item) {
-      return userOrders.filter(o => item.backendStatuses.includes(o.status.toLowerCase()));
+      return userOrders.filter(o => (item.backendStatuses || []).includes((o.status || '').toLowerCase()));
     }
-    return userOrders.filter(o => o.status.toLowerCase() === activeFilter.toLowerCase());
+    return userOrders.filter(o => (o.status || '').toLowerCase() === activeFilter.toLowerCase());
   }, [userOrders, activeFilter]);
 
   const accountOptions = [
@@ -278,8 +278,8 @@ export default function Account() {
           {/* Dynamic Status Cards with Horizontal Scroll and Active Highlight */}
           <div className="flex gap-3 overflow-x-auto pb-4 pt-3 px-4 scroll-smooth no-scrollbar" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
             {darazStatusItems.map((item, i) => {
-              const count = userOrders.filter(o => item.backendStatuses.includes(o.status.toLowerCase())).length;
-              const isTrackingActive = activeTrackingOrder && item.backendStatuses.includes(activeTrackingOrder.status.toLowerCase());
+              const count = userOrders.filter(o => (item.backendStatuses || []).includes((o.status || '').toLowerCase())).length;
+              const isTrackingActive = activeTrackingOrder && (item.backendStatuses || []).includes((activeTrackingOrder.status || '').toLowerCase());
               const isFilteredActive = activeFilter === item.label;
               const IconComp = item.icon;
 
@@ -680,9 +680,9 @@ export default function Account() {
                   { name: 'Shipping', label: 'In Transit', desc: 'Dispatched via trusted express courier service.' },
                   { name: 'Delivered', label: 'Completed', desc: 'Successfully received at designated location.' },
                 ].map((step, idx) => {
-                  const isCompleted = trackingOrder.statusHistory?.some(sh => sh.status.toLowerCase() === step.name.toLowerCase());
-                  const isCurrent = trackingOrder.status.toLowerCase() === step.name.toLowerCase();
-                  const matchLog = trackingOrder.statusHistory?.find(sh => sh.status.toLowerCase() === step.name.toLowerCase());
+                  const isCompleted = trackingOrder.statusHistory?.some(sh => (sh.status || '').toLowerCase() === step.name.toLowerCase());
+                  const isCurrent = (trackingOrder.status || '').toLowerCase() === step.name.toLowerCase();
+                  const matchLog = trackingOrder.statusHistory?.find(sh => (sh.status || '').toLowerCase() === step.name.toLowerCase());
                   const logTime = matchLog ? new Date(matchLog.timestamp).toLocaleString('en-US', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : null;
 
                   return (

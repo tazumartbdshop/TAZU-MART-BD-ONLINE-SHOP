@@ -14,9 +14,9 @@ export function FooterBanner() {
       }
     };
 
-    window.addEventListener('tazu-footer-updated', handleLiveUpdate);
+    window.addEventListener('iyabd-footer-updated', handleLiveUpdate);
     return () => {
-      window.removeEventListener('tazu-footer-updated', handleLiveUpdate);
+      window.removeEventListener('iyabd-footer-updated', handleLiveUpdate);
     };
   }, [fetchFooterSettings]);
 

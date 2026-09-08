@@ -158,7 +158,7 @@ export default function Register() {
   const defaultMaleImg = branding.male_profile_image || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&auto=format&fit=crop&q=80';
   const defaultFemaleImg = branding.female_profile_image || 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&auto=format&fit=crop&q=80';
   const defaultGuestImg = branding.default_profile_image || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80';
-  const defaultBannerImg = liveLoginBanner || branding.login_banner || '';
+  const defaultBannerImg = liveLoginBanner || branding.login_banner || '/auth-banner.webp';
 
   const effectiveAvatar = customPhoto 
     ? customPhoto 
@@ -355,18 +355,44 @@ export default function Register() {
       <div className="w-full max-w-2xl mx-auto p-0 m-0">
         
         {/* ======================================================================= */}
-        {/* 1. FULL WIDTH BANNER IMAGE (0px margin, 0px bottom gap)                 */}
+        {/* 1. FULL WIDTH BANNER IMAGE (0px margin, 0px bottom gap, LQIP + WebP)    */}
         {/* ======================================================================= */}
-        {defaultBannerImg && (
-          <div className="w-full p-0 m-0 block">
+        <div 
+          className="w-full p-0 m-0 block relative aspect-[3/1] sm:aspect-[16/6] bg-neutral-100 overflow-hidden"
+          style={{
+            backgroundImage: `url("data:image/webp;base64,UklGRnwAAABXRUJQVlA4IHAAAACwAwCdASoYABAALuWSyWSkri4uDgDkS2AE6AIFTd6YiY5Oq8aHoAD+zEKYA/AVLb+bsuYAJJvGImFbPIspVqT8mFAUnlR/BYXdLPFroT2xTHWjqvw523oWsTHvlIOd/uSvwzEeGb80/ZyM4doLgAAA")`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+          }}
+        >
+          <picture className="w-full h-full block">
+            <source 
+              media="(max-width: 640px)" 
+              srcSet={defaultBannerImg === '/auth-banner.webp' ? '/auth-banner-mobile.webp' : defaultBannerImg} 
+              type="image/webp" 
+            />
+            <source 
+              srcSet={defaultBannerImg} 
+              type="image/webp" 
+            />
             <img 
               src={defaultBannerImg} 
               alt="Account Banner" 
-              className="w-full h-auto object-contain block m-0 p-0 border-0"
+              className="w-full h-full object-contain block m-0 p-0 border-0 transition-opacity duration-200"
               referrerPolicy="no-referrer"
+              loading="eager"
+              decoding="sync"
+              // @ts-ignore
+              fetchPriority="high"
+              onError={(e) => {
+                const target = e.currentTarget;
+                if (target.src !== window.location.origin + '/auth-banner.webp') {
+                  target.src = '/auth-banner.webp';
+                }
+              }}
             />
-          </div>
-        )}
+          </picture>
+        </div>
 
         {/* ======================================================================= */}
         {/* 2. CREATE ACCOUNT HEADER (Directly below banner with 0px gap)           */}

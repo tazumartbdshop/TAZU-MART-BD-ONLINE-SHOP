@@ -740,7 +740,7 @@ export default function LiveWebsiteGenerator() {
           {website.logo ? (
             <div className="flex items-center gap-2 cursor-pointer" onClick={() => { setCurrentView('home'); setSelectedCategory(null); }}>
               <img src={website.logo} alt="Logo" className="h-8 max-w-[120px] object-contain shrink-0" referrerPolicy="no-referrer" />
-              <span className="font-extrabold text-sm tracking-tight text-gray-400 font-mono hidden sm:inline">{website.website_name.toUpperCase()}</span>
+              <span className="font-extrabold text-sm tracking-tight text-gray-400 font-mono hidden sm:inline">{(website?.website_name || '').toUpperCase()}</span>
             </div>
           ) : (
             <div 

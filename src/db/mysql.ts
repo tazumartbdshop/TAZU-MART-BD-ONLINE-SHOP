@@ -333,6 +333,57 @@ export const dbDelete = async (tableName: string, arg2: any, arg3?: any): Promis
   }
 };
 
+export async function auditAndCleanupNullUsers(): Promise<{ audited: number; cleaned: number; details: any[] }> {
+  const details: any[] = [];
+  let cleanedCount = 0;
+  let auditedCount = 0;
+
+  try {
+    for (const tableName of ['users', 'customers']) {
+      const rows = await dbSelect(tableName);
+      auditedCount += rows.length;
+      for (const row of rows) {
+        let needsUpdate = false;
+        const updates: Record<string, any> = {};
+
+        // Check name / full_name
+        if (!row.name && !row.full_name) {
+          updates.name = 'Valued Customer';
+          needsUpdate = true;
+          details.push({ table: tableName, id: row.id, issue: 'Missing name/full_name (NULL)', action: 'Set name to Valued Customer' });
+        } else if (!row.name && row.full_name) {
+          updates.name = row.full_name;
+          needsUpdate = true;
+        }
+
+        // Check email
+        if (!row.email) {
+          updates.email = `customer_${row.id || Math.random().toString(36).substring(7)}@store.com`;
+          needsUpdate = true;
+          details.push({ table: tableName, id: row.id, issue: 'Missing email (NULL)', action: 'Set fallback email' });
+        }
+
+        // Check phone
+        if (!row.phone) {
+          updates.phone = '01700000000';
+          needsUpdate = true;
+          details.push({ table: tableName, id: row.id, issue: 'Missing phone (NULL)', action: 'Set fallback phone' });
+        }
+
+        if (needsUpdate && row.id) {
+          await dbUpdate(tableName, updates, 'id', row.id);
+          cleanedCount++;
+        }
+      }
+    }
+    console.log(`[Database Audit & Cleanup] Audited ${auditedCount} records. Cleaned ${cleanedCount} records with NULL values.`);
+  } catch (err) {
+    console.warn('[Database Audit & Cleanup] Error during audit:', err);
+  }
+
+  return { audited: auditedCount, cleaned: cleanedCount, details };
+}
+
 export async function syncLocalDbToMysql(): Promise<{ success: boolean; syncedCount: number; errors: string[] }> {
   return { success: true, syncedCount: 0, errors: [] };
 }
@@ -345,5 +396,6 @@ export default {
   dbInsert,
   dbUpdate,
   dbDelete,
-  syncLocalDbToMysql
+  syncLocalDbToMysql,
+  auditAndCleanupNullUsers
 };

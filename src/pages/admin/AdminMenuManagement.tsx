@@ -297,7 +297,7 @@ export default function AdminMenuManagement() {
                   disabled={deleteConfirmText !== (localRenamedMenus[pendingDeleteMenu] || pendingDeleteMenu)}
                   className="w-full py-3.5 bg-red-600 hover:bg-red-700 disabled:bg-zinc-100 disabled:text-zinc-400 disabled:cursor-not-allowed text-white font-black text-xs uppercase tracking-widest transition-all duration-300 rounded-none text-center shadow-md"
                 >
-                  [ DELETE { (localRenamedMenus[pendingDeleteMenu] || pendingDeleteMenu).toUpperCase() } ]
+                  [ DELETE { ((localRenamedMenus[pendingDeleteMenu] || pendingDeleteMenu) || '').toUpperCase() } ]
                 </button>
                 
                 <button

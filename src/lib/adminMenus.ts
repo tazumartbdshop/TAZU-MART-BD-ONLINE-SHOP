@@ -158,6 +158,7 @@ export const defaultNavItems: NavItem[] = [
     moduleId: 'analytics',
     subItems: [
       { name: 'Analytics & Trends', path: '/admin/analytics', icon: LineChart },
+      { name: 'Server Monitoring', path: '/admin/server-monitoring', icon: Server },
       { name: 'Live Visitor Radar', path: '/admin/live-tracking', icon: Radio },
       { name: 'Search Analytics', path: '/admin/search-analytics', icon: Activity },
       { name: 'Search Console & SEO', path: '/admin/marketing/search-console-seo', icon: Search },
@@ -197,6 +198,7 @@ export const defaultNavItems: NavItem[] = [
       { name: 'TikTok', path: '/admin/marketing/tiktok', icon: Video },
       { name: 'Google', path: '/admin/marketing/google', icon: Globe },
       { name: 'Server-Side Tracking', path: '/admin/marketing/server-side', icon: Zap },
+      { name: 'Server Monitoring', path: '/admin/server-monitoring', icon: Server },
       { name: 'Uptime & Telemetry', path: '/admin/marketing/uptime-monitoring', icon: Server },
       { name: 'Search Console & SEO', path: '/admin/marketing/search-console-seo', icon: Search },
       { name: 'Tracking Overview', path: '/admin/marketing/tracking-overview', icon: Activity }
@@ -264,7 +266,7 @@ export const defaultNavItems: NavItem[] = [
     moduleId: 'support',
     subItems: [
       { name: 'Live Support Inbox', path: '/admin/support', icon: MessageSquare },
-      { name: 'AI Support / TAZU Chat', path: '/admin/support/ai', icon: Sparkles }
+      { name: 'AI Support / IYABD Chat', path: '/admin/support/ai', icon: Sparkles }
     ]
   },
   {

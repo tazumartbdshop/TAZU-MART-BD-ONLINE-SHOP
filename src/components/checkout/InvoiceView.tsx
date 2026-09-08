@@ -102,7 +102,7 @@ function InvoiceQRCode({ value, className = "w-20 h-20" }: { value: string; clas
     matrix[i][6] = true;
   }
 
-  const safeVal = String(value || 'TAZU-MART-BD');
+  const safeVal = String(value || 'IYABD');
   let seed = 0;
   for (let i = 0; i < safeVal.length; i++) seed += safeVal.charCodeAt(i) * (i + 1);
 
@@ -184,7 +184,7 @@ export const InvoiceView: React.FC<InvoiceViewProps> = ({ order, onBack }) => {
   // Customer Information
   const customerName = rawOrder.customerName || rawOrder.fullName || 'Valued Customer';
   const mobileNumber = rawOrder.mobileNumber || rawOrder.phone || '+880 1700-000000';
-  const email = rawOrder.email || rawOrder.customerEmail || 'customer@tazumartbd.com';
+  const email = rawOrder.email || rawOrder.customerEmail || 'customer@iyabd.com';
   const fullAddress = rawOrder.fullAddress || rawOrder.address || 'House #12, Road #4, Sector #7, Uttara, Dhaka';
   const city = rawOrder.cityArea || rawOrder.city || 'Dhaka';
   const postalCode = rawOrder.postalCode || '1230';
@@ -291,7 +291,7 @@ export const InvoiceView: React.FC<InvoiceViewProps> = ({ order, onBack }) => {
   };
 
   // Share text builder
-  const invoiceShareText = `Official Invoice (${invoiceId})\nOrder ID: #${orderId}\nCustomer: ${customerName}\nGrand Total: ${currency}${grandTotal.toLocaleString()}\nWebsite: ${settings.websiteUrl || 'https://www.tazumartbd.com'}`;
+  const invoiceShareText = `Official Invoice (${invoiceId})\nOrder ID: #${orderId}\nCustomer: ${customerName}\nGrand Total: ${currency}${grandTotal.toLocaleString()}\nWebsite: ${settings.websiteUrl || 'https://www.iyabd.com'}`;
   const shareUrl = window.location.href;
 
   // 2. Share Action
@@ -299,7 +299,7 @@ export const InvoiceView: React.FC<InvoiceViewProps> = ({ order, onBack }) => {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: `Invoice ${invoiceId} - TAZU MART BD`,
+          title: `Invoice ${invoiceId} - IYABD`,
           text: invoiceShareText,
           url: shareUrl,
         });
@@ -443,7 +443,7 @@ export const InvoiceView: React.FC<InvoiceViewProps> = ({ order, onBack }) => {
               </a>
 
               <a
-                href={`mailto:?subject=${encodeURIComponent(`Invoice ${invoiceId} - TAZU MART BD`)}&body=${encodeURIComponent(invoiceShareText + "\n" + shareUrl)}`}
+                href={`mailto:?subject=${encodeURIComponent(`Invoice ${invoiceId} - IYABD`)}&body=${encodeURIComponent(invoiceShareText + "\n" + shareUrl)}`}
                 className="col-span-2 flex items-center justify-center gap-2 p-2.5 bg-neutral-900 hover:bg-black text-white rounded font-bold cursor-pointer transition-colors"
               >
                 <Mail className="w-4 h-4" />
@@ -526,7 +526,7 @@ export const InvoiceView: React.FC<InvoiceViewProps> = ({ order, onBack }) => {
                 {settings.invoiceLogo || settings.storeLogo || branding.primary_logo ? (
                   <img 
                     src={settings.invoiceLogo || settings.storeLogo || branding.primary_logo} 
-                    alt="TAZU MART BD" 
+                    alt="IYABD" 
                     className="h-12 w-auto object-contain" 
                     referrerPolicy="no-referrer" 
                   />
@@ -537,7 +537,7 @@ export const InvoiceView: React.FC<InvoiceViewProps> = ({ order, onBack }) => {
                 )}
                 <div>
                   <h1 className="text-2xl font-black uppercase tracking-tight text-neutral-950">
-                    {settings.storeName || "TAZU MART BD"}
+                    {settings.storeName || "IYABD"}
                   </h1>
                   <p className="text-neutral-600 text-xs font-semibold uppercase tracking-wider">
                     {settings.storeTagline || "Official E-Commerce Store"}
@@ -552,11 +552,11 @@ export const InvoiceView: React.FC<InvoiceViewProps> = ({ order, onBack }) => {
                 </span>
                 <span>•</span>
                 <span className="flex items-center gap-1">
-                  <Mail className="w-3.5 h-3.5 text-neutral-900" /> {settings.storeEmail || "support@tazumartbd.com"}
+                  <Mail className="w-3.5 h-3.5 text-neutral-900" /> {settings.storeEmail || "support@iyabd.com"}
                 </span>
                 <span>•</span>
                 <span className="flex items-center gap-1">
-                  <Globe className="w-3.5 h-3.5 text-neutral-900" /> {settings.websiteUrl || "www.tazumartbd.com"}
+                  <Globe className="w-3.5 h-3.5 text-neutral-900" /> {settings.websiteUrl || "www.iyabd.com"}
                 </span>
               </div>
             </div>
@@ -852,13 +852,13 @@ export const InvoiceView: React.FC<InvoiceViewProps> = ({ order, onBack }) => {
               {/* Brand info */}
               <div className="space-y-1 text-center sm:text-left">
                 <p className="font-black text-sm uppercase tracking-wider text-neutral-950">
-                  {settings.storeName || "TAZU MART BD"}
+                  {settings.storeName || "IYABD"}
                 </p>
                 <p className="text-[10px] text-neutral-600 font-medium">
-                  Support: {settings.contactNumber || "+880 1314 541738"} | Email: {settings.storeEmail || "support@tazumartbd.com"}
+                  Support: {settings.contactNumber || "+880 1314 541738"} | Email: {settings.storeEmail || "support@iyabd.com"}
                 </p>
                 <p className="text-[10px] text-neutral-500 uppercase tracking-widest font-bold">
-                  Facebook: /tazumartbd • Instagram: @tazumartbd • TikTok: @tazumartbd
+                  Facebook: /iyabd • Instagram: @iyabd • TikTok: @iyabd
                 </p>
               </div>
 
@@ -876,7 +876,7 @@ export const InvoiceView: React.FC<InvoiceViewProps> = ({ order, onBack }) => {
             {/* Bottom Copyright & Legal Notice */}
             <div className="text-center text-[10px] text-neutral-500 font-medium space-y-0.5">
               <p className="font-bold text-neutral-800 uppercase tracking-widest">
-                © 2026 TAZU MART BD. All Rights Reserved.
+                © 2026 IYABD. All Rights Reserved.
               </p>
               <p className="italic text-neutral-500">
                 {settings.invoiceFooterText || "This is a Computer Generated Invoice. No signature is required for digital verification."}
@@ -894,7 +894,7 @@ export const InvoiceView: React.FC<InvoiceViewProps> = ({ order, onBack }) => {
               Need assistance with this order?
             </p>
             <p className="text-[11px] text-neutral-300">
-              Contact our Support Hotline at {settings.contactNumber || "+880 1314 541738"} or email {settings.storeEmail || "support@tazumartbd.com"}
+              Contact our Support Hotline at {settings.contactNumber || "+880 1314 541738"} or email {settings.storeEmail || "support@iyabd.com"}
             </p>
           </div>
 

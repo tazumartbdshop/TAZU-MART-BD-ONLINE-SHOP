@@ -284,7 +284,7 @@ export function CompactProductCard({ product, rank }: any) {
               <div className="p-6">
                 <div className="flex justify-between items-center mb-6">
                   <div className="flex items-center gap-2">
-                    <h3 className="text-sm font-black uppercase tracking-tight text-black">Tazu Coins Reward</h3>
+                    <h3 className="text-sm font-black uppercase tracking-tight text-black">IYABD Coins Reward</h3>
                   </div>
                   <button onClick={() => setShowCoinInfo(false)} className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-400">
                     <X className="w-5 h-5" />
@@ -296,7 +296,7 @@ export function CompactProductCard({ product, rank }: any) {
                     <span className="text-3xl">🪙</span>
                     <div>
                       <p className="text-[9px] font-black text-orange-400 uppercase tracking-widest mb-1">You will earn</p>
-                      <p className="text-xl font-black text-black">+{rewardCoins} Tazu Coins</p>
+                      <p className="text-xl font-black text-black">+{rewardCoins} IYABD Coins</p>
                     </div>
                   </div>
                 </div>

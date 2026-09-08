@@ -18,8 +18,8 @@ export default function Login() {
   const { settings } = useSettingsStore();
   const { settings: branding } = useBrandingStore();
   const { bannerUrl: liveLoginBanner } = useLoginBanner();
-  const loginBannerImg = liveLoginBanner || branding.login_banner || '';
-  const ADMIN_EMAIL = (settings.adminEmail && settings.adminEmail !== "admin@tazumart.com" ? settings.adminEmail : "admin.tazumartbd@gmail.com").toLowerCase().trim();
+  const loginBannerImg = liveLoginBanner || branding.login_banner || '/auth-banner.webp';
+  const ADMIN_EMAIL = (settings.adminEmail && settings.adminEmail !== "admin@iyabd.com" ? settings.adminEmail : "admin.iyabd@gmail.com").toLowerCase().trim();
   const ADMIN_PASSWORD = settings.adminPassword && settings.adminPassword !== "12345678" ? settings.adminPassword : "8963885522";
 
   const [loginTab, setLoginTab] = useState<'email' | 'phone'>('email');
@@ -343,21 +343,43 @@ export default function Login() {
         animate={{ opacity: 1, scale: 1, y: 0 }}
         className="w-full max-w-[420px] bg-white px-5 py-4 md:px-6 md:py-5 rounded-[6px] border border-neutral-200 shadow-sm"
       >
-        {/* Dynamic Login Banner from login_banners table */}
-        {loginBannerImg && (
-          <div className="w-full mb-4 overflow-hidden rounded-[4px] border border-neutral-200 bg-neutral-50 select-none">
+        {/* Dynamic Login Banner with LQIP Blur Preview & Responsive WebP */}
+        <div 
+          className="w-full mb-4 overflow-hidden rounded-[4px] border border-neutral-200 bg-neutral-100 select-none relative aspect-[3/2]"
+          style={{
+            backgroundImage: `url("data:image/webp;base64,UklGRnwAAABXRUJQVlA4IHAAAACwAwCdASoYABAALuWSyWSkri4uDgDkS2AE6AIFTd6YiY5Oq8aHoAD+zEKYA/AVLb+bsuYAJJvGImFbPIspVqT8mFAUnlR/BYXdLPFroT2xTHWjqvw523oWsTHvlIOd/uSvwzEeGb80/ZyM4doLgAAA")`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+          }}
+        >
+          <picture className="w-full h-full block">
+            <source 
+              media="(max-width: 640px)" 
+              srcSet={loginBannerImg === '/auth-banner.webp' ? '/auth-banner-mobile.webp' : loginBannerImg} 
+              type="image/webp" 
+            />
+            <source 
+              srcSet={loginBannerImg} 
+              type="image/webp" 
+            />
             <img 
               src={loginBannerImg} 
               alt="Login Banner" 
-              className="w-full aspect-[3/2] object-contain bg-white block"
+              className="w-full h-full object-contain bg-white/40 block transition-opacity duration-200"
               referrerPolicy="no-referrer"
+              loading="eager"
+              decoding="sync"
+              // @ts-ignore
+              fetchPriority="high"
               onError={(e) => {
-                e.currentTarget.onerror = null;
-                e.currentTarget.src = 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=1200&auto=format&fit=crop&q=80';
+                const target = e.currentTarget;
+                if (target.src !== window.location.origin + '/auth-banner.webp') {
+                  target.src = '/auth-banner.webp';
+                }
               }}
             />
-          </div>
-        )}
+          </picture>
+        </div>
 
         <div className="text-center mb-5">
           <Link to="/" className="flex flex-col items-center gap-2 mb-2">
@@ -372,7 +394,7 @@ export default function Login() {
               )}
             </div>
             <h1 className="text-base font-black tracking-tight text-neutral-950 uppercase leading-none">
-              {settings.storeName || 'TAZU MART BD'}
+              {settings.storeName || 'IYABD'}
             </h1>
           </Link>
           <p className="text-[12px] text-neutral-500 text-center leading-[1.3] px-1 max-w-[380px] mx-auto">

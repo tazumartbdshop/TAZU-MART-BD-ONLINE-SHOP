@@ -1,46 +1,5 @@
 {
-  "updatedAt": "2026-09-06T04:31:37.228Z",
-  "dailySummaries": {
-    "2026-09-06": {
-      "date": "2026-09-06",
-      "visits": 0,
-      "uniqueVisitors": 1,
-      "visitorIds": [
-        "v_5ipykg3dy_mtpa61hd"
-      ],
-      "newAccounts": 0,
-      "uniqueLoginUsers": 0,
-      "loginUserIds": [],
-      "loginEvents": 0,
-      "productViews": 0,
-      "productViewCounts": {},
-      "addToCartCount": 0,
-      "checkoutCount": 0,
-      "ordersCount": 0,
-      "completedOrdersCount": 0,
-      "revenue": 0
-    }
-  },
-  "recentEvents": [
-    {
-      "eventId": "page_view_wjm7c0_1788668805834",
-      "sessionId": "s_ky5ulz11a_mtpa61hh",
-      "visitorId": "v_5ipykg3dy_mtpa61hd",
-      "userId": null,
-      "userName": null,
-      "eventType": "page_view",
-      "path": "/",
-      "title": "TAZU MART BD - Premium Fashion & Lifestyle",
-      "referrer": "https://aistudio.google.com/",
-      "timestamp": "2026-09-06T04:26:45.834Z",
-      "dateString": "2026-09-06",
-      "device": {
-        "isMobile": true,
-        "screen": "421x581",
-        "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36"
-      },
-      "metadata": {},
-      "ip": "103.16.250.5"
-    }
-  ]
+  "updatedAt": "2026-09-08T13:18:01.092Z",
+  "dailySummaries": {},
+  "recentEvents": []
 }

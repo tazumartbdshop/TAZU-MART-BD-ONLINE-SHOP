@@ -8,7 +8,6 @@ import { MobileBottomNav } from './MobileBottomNav';
 import { ShieldAlert } from 'lucide-react';
 import useScrollToTop from '../../utils/db/hooks/useScrollToTop';
 import { StorefrontPopup } from '../ui/StorefrontPopup';
-import { AiSupportAgent } from '../common/AiSupportAgent';
 import { useEffect, useState } from 'react';
 import { pixelService } from '../../utils/pixelService';
 
@@ -45,7 +44,7 @@ export function UserLayout() {
     );
   }
 
-  const isHome = location.pathname === '/';
+  const isHome = location.pathname === '/' || location.pathname === '';
   const isBrandShowcasePage = 
     location.pathname === '/categories' ||
     location.pathname.startsWith('/category/') ||
@@ -96,7 +95,6 @@ export function UserLayout() {
       
       <MobileBottomNav />
       <StorefrontPopup />
-      {location.pathname !== '/' && location.pathname !== '' && <AiSupportAgent />}
     </div>
   );
 }

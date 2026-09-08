@@ -45,8 +45,8 @@ export function Header() {
   const isSettingsLoaded = useSettingsStore((state) => state.isLoaded);
   const isBrandingLoaded = useBrandingStore((state) => state.isLoaded);
 
-  const logoUrl = !logoError ? (settings.storeLogo || branding.primary_logo || branding.desktop_logo || branding.mobile_logo) : '';
-  const isLoadingLogo = !isSettingsLoaded && !isBrandingLoaded;
+  const logoUrl = !logoError ? (settings.storeLogo || branding.primary_logo || branding.desktop_logo || branding.mobile_logo || '/logo.png') : '/logo.png';
+  const isLoadingLogo = false;
 
   const { data: siteData, fetchSettings } = useSiteManagementStore();
   const { products } = useProductStore();
@@ -90,7 +90,7 @@ export function Header() {
     }
   };
 
-  const displayTagline = settings.storeTagline?.trim() || branding.site_tagline?.trim() || 'TAZU MART BD - YOUR TRUSTED ONLINE SHOPPING DESTINATION';
+  const displayTagline = settings.storeTagline?.trim() || branding.site_tagline?.trim() || 'IYABD - YOUR TRUSTED ONLINE SHOPPING DESTINATION';
 
   return (
     <>
@@ -128,24 +128,28 @@ export function Header() {
               <Menu className="w-5.5 h-5.5" />
             </button>
 
-            <Link to="/" className="flex items-center gap-1.5 shrink-0">
-              <div className={`w-7.5 h-7.5 md:w-8.5 md:h-8.5 rounded flex items-center justify-center font-sans font-black text-base md:text-lg overflow-hidden shrink-0 ${logoUrl || isLoadingLogo ? 'bg-transparent' : 'bg-theme-secondary text-theme-bg'}`}>
-                 {logoUrl ? (
-                   <img 
-                     src={logoUrl} 
-                     onError={() => setLogoError(true)} 
-                     alt={branding.site_short_name || "Logo"} 
-                     className="w-full h-full object-contain" 
-                     referrerPolicy="no-referrer" 
-                   />
-                 ) : isLoadingLogo ? (
-                   null
-                 ) : (
-                   null
-                 )}
+            <Link to="/" className="flex items-center gap-1.5 shrink-0 group">
+              <div className="w-8 h-8 md:w-9 md:h-9 flex items-center justify-center font-sans overflow-hidden shrink-0 bg-transparent">
+                <img 
+                  src={logoUrl} 
+                  onError={(e) => {
+                    if ((e.target as HTMLImageElement).src !== window.location.origin + '/logo.png') {
+                      (e.target as HTMLImageElement).src = '/logo.png';
+                    } else {
+                      setLogoError(true);
+                    }
+                  }} 
+                  alt={branding.site_short_name || settings.storeName || "Logo"} 
+                  className="w-full h-full object-contain select-none" 
+                  referrerPolicy="no-referrer" 
+                  loading="eager"
+                  decoding="sync"
+                  // @ts-ignore
+                  fetchPriority="high"
+                />
               </div>
               <span className="font-display font-black text-[15px] xs:text-base md:text-xl text-navbar-text tracking-tight uppercase whitespace-nowrap">
-                {settings.storeName || 'TAZU MART BD'}
+                {settings.storeName || 'IYABD'}
               </span>
             </Link>
           </div>
@@ -217,18 +221,24 @@ export function Header() {
               {/* Drawer Header */}
               <div className="px-4 py-4 border-b border-border-theme flex justify-between items-center bg-bg-primary sticky top-0 z-20 transition-colors duration-200">
                 <Link to="/" className="flex items-center gap-2" onClick={() => setIsMobileMenuOpen(false)}>
-                  <div className={`w-9 h-9 md:w-10 md:h-10 rounded-[10px] flex items-center justify-center font-black text-xl overflow-hidden shadow-sm shrink-0 ${logoUrl || isLoadingLogo ? 'bg-transparent' : 'bg-bg-secondary text-text-primary border border-border-theme'}`}>
-                    {logoUrl ? (
-                      <img 
-                        src={logoUrl} 
-                        alt={settings.storeName || "Logo"} 
-                        className="w-full h-full object-contain transition-all duration-300" 
-                        referrerPolicy="no-referrer" 
-                        onError={() => setLogoError(true)}
-                      />
-                    ) : (
-                      <span className="text-sm font-black uppercase text-text-primary">TM</span>
-                    )}
+                  <div className="w-9 h-9 md:w-10 md:h-10 flex items-center justify-center font-black text-xl overflow-hidden shrink-0 bg-transparent">
+                    <img 
+                      src={logoUrl} 
+                      alt={settings.storeName || "Logo"} 
+                      className="w-full h-full object-contain select-none" 
+                      referrerPolicy="no-referrer" 
+                      loading="eager"
+                      decoding="sync"
+                      // @ts-ignore
+                      fetchPriority="high"
+                      onError={(e) => {
+                        if ((e.target as HTMLImageElement).src !== window.location.origin + '/logo.png') {
+                          (e.target as HTMLImageElement).src = '/logo.png';
+                        } else {
+                          setLogoError(true);
+                        }
+                      }}
+                    />
                   </div>
                   {settings.storeName && settings.storeName.trim() !== '' && (
                     <span className="font-display font-black text-[15px] md:text-base text-text-primary tracking-tight uppercase whitespace-nowrap">
@@ -263,7 +273,7 @@ export function Header() {
                 <div className="p-4 bg-bg-secondary border-b border-border-theme">
                   {isAuthenticated ? (
                     <Link 
-                      to="/account" 
+                      to={user?.role === 'admin' || user?.role === 'moderator' ? '/admin' : '/account'} 
                       className="flex items-center gap-3 group bg-bg-primary p-3 rounded-[16px] border border-border-theme shadow-sm transition-all hover:border-neutral-300 dark:hover:border-neutral-700"
                       onClick={() => setIsMobileMenuOpen(false)}
                     >
@@ -271,7 +281,7 @@ export function Header() {
                          {user?.profileImage ? (
                            <img src={user.profileImage} alt="" className="w-full h-full object-cover" />
                          ) : (
-                           user?.name ? user.name.charAt(0).toUpperCase() : <User className="w-6 h-6" />
+                           (user?.name || 'User').charAt(0).toUpperCase()
                          )}
                       </div>
                       <div className="flex-1 min-w-0">
@@ -289,7 +299,7 @@ export function Header() {
                     </Link>
                   ) : (
                     <Link 
-                      to="/account" 
+                      to={user?.role === 'admin' || user?.role === 'moderator' ? '/admin' : '/account'} 
                       className="flex items-center gap-3 group bg-bg-primary p-3 rounded-[16px] border border-border-theme shadow-sm transition-all hover:border-neutral-300 dark:hover:border-neutral-700"
                       onClick={() => setIsMobileMenuOpen(false)}
                     >
@@ -554,7 +564,7 @@ export function Header() {
                    </div>
                  ) : (
                    <Link 
-                     to="/account"
+                     to={user?.role === 'admin' || user?.role === 'moderator' ? '/admin' : '/account'}
                      onClick={() => setIsMobileMenuOpen(false)}
                      className="w-full h-[52px] bg-text-primary hover:opacity-90 text-bg-primary rounded-[12px] font-black uppercase tracking-widest text-xs flex items-center justify-center gap-2.5 transition-all shadow-lg active:scale-95"
                    >

@@ -12,7 +12,7 @@ export interface SEOProps {
 }
 
 /**
- * Universal Dynamic SEO Hook for TAZU MART BD
+ * Universal Dynamic SEO Hook for IYABD
  * Dynamically updates <title>, <meta description>, canonical link, OpenGraph,
  * Twitter Card, and JSON-LD Structured Data in the document <head>.
  */
@@ -28,10 +28,10 @@ export function useDynamicSEO({
 }: SEOProps) {
   useEffect(() => {
     // 1. Update Title
-    const baseSiteName = 'TAZU MART BD';
+    const baseSiteName = 'IYABD';
     const finalTitle = title 
       ? (title.includes(baseSiteName) ? title : `${title} | ${baseSiteName}`)
-      : 'TAZU MART BD - Official Online Shopping in Bangladesh';
+      : 'IYABD - Official Online Shopping in Bangladesh';
     document.title = finalTitle;
 
     // 2. Helper to set or create <meta>
@@ -65,7 +65,7 @@ export function useDynamicSEO({
     };
 
     // 4. Meta Description & Keywords
-    const defaultDesc = 'Shop genuine watches, leather accessories, and lifestyle essentials at best prices with fast nationwide delivery from TAZU MART BD.';
+    const defaultDesc = 'Shop genuine watches, leather accessories, and lifestyle essentials at best prices with fast nationwide delivery from IYABD.';
     const finalDesc = description || defaultDesc;
     setMetaTag('name', 'description', finalDesc);
 
@@ -81,7 +81,7 @@ export function useDynamicSEO({
     }
 
     // 6. Canonical URL
-    const siteBase = 'https://tazumartbd.com';
+    const siteBase = 'https://iyabd.com';
     const finalCanonical = canonicalUrl 
       ? (canonicalUrl.startsWith('http') ? canonicalUrl : `${siteBase}${canonicalUrl.startsWith('/') ? '' : '/'}${canonicalUrl}`)
       : window.location.href;
@@ -108,7 +108,7 @@ export function useDynamicSEO({
     }
 
     // 9. Structured Data (JSON-LD)
-    const scriptId = 'tazu-dynamic-jsonld';
+    const scriptId = 'iyabd-dynamic-jsonld';
     let scriptEl = document.getElementById(scriptId) as HTMLScriptElement | null;
     
     if (jsonLd) {

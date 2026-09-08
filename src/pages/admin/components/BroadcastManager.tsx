@@ -118,7 +118,7 @@ export const BroadcastManager = () => {
     setProductSearch('');
     setCtaLink('');
     setManagerTab('directory');
-    alert(`Campaign successfully created and saved as ${status.toUpperCase()}!`);
+    alert(`Campaign successfully created and saved as ${(status || '').toUpperCase()}!`);
   };
 
   // Automated removal of expired items simulation
@@ -640,7 +640,7 @@ export const BroadcastManager = () => {
                              setSelectedProductId(e.target.value);
                              const p = products.find(prod => prod.id === e.target.value);
                              if (p) {
-                               setCampaignTitle(`${p.name.toUpperCase()} - FLAT ${discountPercent}% OFF`);
+                               setCampaignTitle(`${(p.name || '').toUpperCase()} - FLAT ${discountPercent}% OFF`);
                              }
                            }}
                            className="w-full px-3 py-2 bg-white border border-gray-300 text-xs font-bold uppercase mt-1 focus:outline-none focus:border-black"
@@ -648,7 +648,7 @@ export const BroadcastManager = () => {
                             <option value="">-- Choose Product --</option>
                             {productSuggestions.map((prod) => (
                                <option key={prod.id} value={prod.id}>
-                                  [{prod.category.toUpperCase()}] {prod.name} - ৳{prod.price}
+                                  [{(prod.category || '').toUpperCase()}] {prod.name} - ৳{prod.price}
                                </option>
                             ))}
                          </select>
@@ -688,7 +688,7 @@ export const BroadcastManager = () => {
                             <option value="">-- Choose Category --</option>
                             {categories.map((cat) => (
                                <option key={cat.id} value={cat.name}>
-                                  {cat.name.toUpperCase()}
+                                  {(cat.name || '').toUpperCase()}
                                 </option>
                             ))}
                          </select>
@@ -1000,7 +1000,7 @@ export const BroadcastManager = () => {
                                 {b.status?.toUpperCase() || 'PUBLISHED'}
                              </span>
                              <span className="text-[8.5px] font-extrabold text-indigo-600 uppercase">
-                                Target: {b.audience.toUpperCase()} CUSTOMERS
+                                Target: {(b.audience || '').toUpperCase()} CUSTOMERS
                              </span>
                           </div>
                           
@@ -1014,7 +1014,7 @@ export const BroadcastManager = () => {
                           </p>
                           
                           <div className="flex items-center gap-3 text-[9px] text-gray-400 font-bold uppercase mt-1">
-                             <span>Type: {b.type.toUpperCase()}</span>
+                             <span>Type: {(b.type || '').toUpperCase()}</span>
                              <span>Priority: {b.priority || 'high'}</span>
                              {b.endDate && <span className="text-rose-600 font-extrabold">Expires: {b.endDate}</span>}
                           </div>

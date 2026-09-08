@@ -269,7 +269,7 @@ function AllOffersView() {
                         <div className="flex flex-wrap gap-1">
                           <span className="inline-flex items-center gap-1.5 text-[10px] font-black text-black bg-white border border-neutral-300 px-2.5 py-1.5 uppercase tracking-[0.14em] rounded-md shadow-sm">
                             <span className="w-2 h-2 bg-black rounded-full animate-pulse shrink-0" />
-                            {offer.name.toUpperCase()}
+                            {(offer?.name || '').toUpperCase()}
                           </span>
                         </div>
                       </div>

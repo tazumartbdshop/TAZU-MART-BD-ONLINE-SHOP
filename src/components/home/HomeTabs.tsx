@@ -5,6 +5,7 @@ import { useProductStore } from '../../store/useProductStore';
 import { CompactProductCard } from '../product/CompactProductCard';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '../../lib/utils';
+import { campaignService } from '../../services/campaignService';
 
 type TabType = 'flash-sale' | 'trending' | 'best-selling';
 
@@ -126,6 +127,8 @@ export default function HomeTabs() {
         <div className="mt-8 flex justify-center">
           <Link 
             to="/offers"
+            onMouseEnter={() => campaignService.preloadActiveCampaigns()}
+            onTouchStart={() => campaignService.preloadActiveCampaigns()}
             className="group flex items-center gap-3 px-8 py-3.5 bg-neutral-950 text-white rounded-full text-[10px] font-black uppercase tracking-[0.2em] shadow-xl shadow-neutral-900/10 hover:shadow-neutral-900/20 active:scale-95 transition-all"
           >
             Explore All Offers

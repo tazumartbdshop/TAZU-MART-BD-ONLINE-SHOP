@@ -752,7 +752,7 @@ export default function AdminPopupOfferManager() {
                     {/* Fake daraz coupon preview */}
                     <div className="bg-orange-50 text-[#f57224] py-1 px-3.5 rounded-lg border border-dashed border-[#f57224] max-w-[190px] mx-auto my-2 text-center select-none font-bold text-[10px] flex flex-col items-center justify-center">
                       <span className="text-[7.5px] font-bold text-neutral-800 uppercase tracking-widest">CHECKOUT ACCELERATOR</span>
-                      <span>{getCategoryName(categoryId).toUpperCase() || 'Priority Deal'}</span>
+                      <span>{(getCategoryName(categoryId) || '').toUpperCase() || 'Priority Deal'}</span>
                     </div>
 
                     <p className="text-[10px] font-bold text-neutral-550 leading-relaxed max-w-[220px] mx-auto limit-3-lines">

@@ -101,7 +101,7 @@ const defaultConfig: MarketingConfig = {
       lead: false,
       completeRegistration: false,
     },
-    domainVerification: 'tazumart.com-fb-verify-91zobpq83',
+    domainVerification: 'iyabd.com-fb-verify-91zobpq83',
     eventMatchQuality: '8.4 / 10 (Very High)',
     serverSideTracking: true,
     autoEventDetection: true,
@@ -130,7 +130,7 @@ const defaultConfig: MarketingConfig = {
     gtmId: 'GTM-K98ZFXB',
     conversionId: 'AW-110283918-X',
     conversionLabel: 'g_ads_purchase_conv',
-    serviceAccountJsonName: 'tazu-analytics-service-key.json',
+    serviceAccountJsonName: 'iyabd-analytics-service-key.json',
     events: {
       pageTracking: true,
       ecommerceTracking: true,
@@ -167,7 +167,7 @@ export default function AdminMarketingSetup({ type }: AdminMarketingSetupProps) 
 
   // Load configuration from localstorage on mount or type change
   useEffect(() => {
-    const saved = localStorage.getItem('tazu_mart_marketing_config');
+    const saved = localStorage.getItem('iyabd_marketing_config');
     if (saved) {
       try {
         setConfig(JSON.parse(saved));
@@ -175,12 +175,12 @@ export default function AdminMarketingSetup({ type }: AdminMarketingSetupProps) 
         console.error('Failed to parse marketing configuration', e);
       }
     } else {
-      localStorage.setItem('tazu_mart_marketing_config', JSON.stringify(defaultConfig));
+      localStorage.setItem('iyabd_marketing_config', JSON.stringify(defaultConfig));
     }
   }, [type]);
 
   const saveToLocalStorage = (updatedConfig: MarketingConfig) => {
-    localStorage.setItem('tazu_mart_marketing_config', JSON.stringify(updatedConfig));
+    localStorage.setItem('iyabd_marketing_config', JSON.stringify(updatedConfig));
   };
 
   const handleCopyToClipboard = (text: string, fieldName: string) => {
@@ -248,7 +248,7 @@ export default function AdminMarketingSetup({ type }: AdminMarketingSetupProps) 
       
       setAlert({
         type: 'success',
-        message: `${type.toUpperCase()} Tracking configuration published and connected successfully.`
+        message: `${(type || '').toUpperCase()} Tracking configuration published and connected successfully.`
       });
     }, 1200);
   };
@@ -1268,7 +1268,7 @@ export default function AdminMarketingSetup({ type }: AdminMarketingSetupProps) 
               <div className="flex items-center gap-2">
                 <span className={`w-2.5 h-2.5 border border-black ${verifying ? 'bg-amber-400 animate-pulse' : handshakeSuccess ? 'bg-emerald-500' : 'bg-red-500'}`}></span>
                 <span className="text-xs font-black uppercase tracking-widest text-black">
-                  {activeHandshakeType?.toUpperCase()} HANDSHAKE SIGNAL
+                  {(activeHandshakeType || '').toUpperCase()} HANDSHAKE SIGNAL
                 </span>
               </div>
               <button 

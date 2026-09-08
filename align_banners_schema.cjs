@@ -3,9 +3,9 @@ const mysql = require('mysql2/promise');
 async function run() {
   const config = {
     host: 'auth-db2141.hstgr.io',
-    user: 'u103041740_tazumartbd',
+    user: 'u103041740_iyabd',
     password: 'YOU@suf60679',
-    database: 'u103041740_TAZU_MART_BD',
+    database: 'u103041740_IYABD',
   };
 
   const conn = await mysql.createConnection(config);

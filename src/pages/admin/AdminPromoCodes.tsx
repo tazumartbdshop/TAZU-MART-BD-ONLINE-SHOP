@@ -61,7 +61,7 @@ export default function AdminPromoCodes() {
     
     // Duplicate check
     const isDuplicate = promoCodes.some(p => 
-      p.code.toUpperCase() === formData.code.toUpperCase() && 
+      (p.code || '').toUpperCase() === (formData.code || '').toUpperCase() && 
       (!editingPromo || p.id !== editingPromo.id)
     );
 
@@ -73,7 +73,7 @@ export default function AdminPromoCodes() {
     if (editingPromo) {
       await updatePromoCode(editingPromo.id, {
         name: formData.name,
-        code: formData.code.toUpperCase().trim(),
+        code: (formData.code || '').toUpperCase().trim(),
         type: formData.type,
         value: Number(formData.value),
         minOrder: Number(formData.minOrder),
@@ -84,7 +84,7 @@ export default function AdminPromoCodes() {
     } else {
       await addPromoCode({
         name: formData.name,
-        code: formData.code.toUpperCase().trim(),
+        code: (formData.code || '').toUpperCase().trim(),
         type: formData.type,
         value: Number(formData.value),
         minOrder: Number(formData.minOrder),

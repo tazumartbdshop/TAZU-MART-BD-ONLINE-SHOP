@@ -90,8 +90,8 @@ export default function CategoryPage() {
     "@context": "https://schema.org",
     "@type": "CollectionPage",
     "name": `${category.name} Collection`,
-    "description": `Shop authentic ${category.name} at best prices with nationwide delivery from TAZU MART BD.`,
-    "url": `https://tazumartbd.com/category/${category.slug || category.id}`,
+    "description": `Shop authentic ${category.name} at best prices with nationwide delivery from IYABD.`,
+    "url": `https://iyabd.com/category/${category.slug || category.id}`,
     "mainEntity": {
       "@type": "ItemList",
       "numberOfItems": categoryProducts.length,
@@ -99,19 +99,19 @@ export default function CategoryPage() {
         "@type": "ListItem",
         "position": idx + 1,
         "name": prod.name,
-        "url": `https://tazumartbd.com/product/${prod.slug || prod.id}`
+        "url": `https://iyabd.com/product/${prod.slug || prod.id}`
       }))
     }
   };
 
   useDynamicSEO({
-    title: `${category.name} Collection & Price in Bangladesh | TAZU MART BD`,
-    description: `Discover genuine ${category.name} at TAZU MART BD. Premium quality, best market price, and cash on delivery across Bangladesh.`,
+    title: `${category.name} Collection & Price in Bangladesh | IYABD`,
+    description: `Discover genuine ${category.name} at IYABD. Premium quality, best market price, and cash on delivery across Bangladesh.`,
     canonicalUrl: `/category/${category.slug || category.id}`,
     ogImage: category.bannerImage,
     ogType: 'website',
     jsonLd: categoryJsonLd,
-    keywords: [category.name, 'TAZU MART BD', `${category.name} Bangladesh`, 'Online Shopping BD']
+    keywords: [category.name, 'IYABD', `${category.name} Bangladesh`, 'Online Shopping BD']
   });
 
   return (

@@ -1,4 +1,4 @@
--- TAZU MART BD - MySQL Database Schema
+-- IYABD - MySQL Database Schema
 -- Compatible with Hostinger MySQL / MariaDB
 
 SET FOREIGN_KEY_CHECKS = 0;
@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS products (
   rating DECIMAL(3,2) DEFAULT 5.00,
   reviews INT DEFAULT 0,
   is_new TINYINT(1) DEFAULT 1,
-  brand VARCHAR(128) DEFAULT 'TAZU MART BD',
+  brand VARCHAR(128) DEFAULT 'IYABD',
   status VARCHAR(32) DEFAULT 'Active',
   description LONGTEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

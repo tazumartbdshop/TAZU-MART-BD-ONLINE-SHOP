@@ -611,7 +611,7 @@ export const OrderActionSheet: React.FC<OrderActionSheetProps> = ({
                                 ) : (
                                   <div className="w-7 h-7 bg-black rounded flex items-center justify-center text-white font-black text-sm">TM</div>
                                 )}
-                                <h1 className="text-sm font-black uppercase text-zinc-950">{settings.storeName || 'TAZU MART BD'}</h1>
+                                <h1 className="text-sm font-black uppercase text-zinc-950">{settings.storeName || 'IYABD'}</h1>
                               </div>
                               <p className="text-[9px] text-zinc-500 font-bold leading-tight uppercase">
                                 {settings.storeEmail || 'admin@luxemart.bd'}<br />
@@ -792,7 +792,7 @@ export const OrderActionSheet: React.FC<OrderActionSheetProps> = ({
                       {/* Brand and Barcode Simulated header */}
                       <div className="border-b-2 border-black pb-2 mb-2 flex justify-between items-center bg-black text-white p-2 text-[10px]">
                         <div>
-                          <h1 className="font-black uppercase tracking-widest text-[#FFFFFF]">TAZU MART SHIPMENT</h1>
+                          <h1 className="font-black uppercase tracking-widest text-[#FFFFFF]">IYABD SHIPMENT</h1>
                           <p className="text-[8px] text-zinc-300 font-bold uppercase leading-none">Parcel routing slip</p>
                         </div>
                         <span className="text-[9px] font-black px-1.5 py-0.5 bg-yellow-400 text-black uppercase">COD</span>
@@ -801,7 +801,7 @@ export const OrderActionSheet: React.FC<OrderActionSheetProps> = ({
                       {/* Sender Info block */}
                       <div className="border-b border-zinc-200 pb-2 mb-2">
                         <span className="block text-[8px] uppercase text-zinc-400 font-bold">1. FROM (SENDER)</span>
-                        <p className="font-black text-zinc-900">{settings.storeName || 'TAZU MART BD'}</p>
+                        <p className="font-black text-zinc-900">{settings.storeName || 'IYABD'}</p>
                         <p className="text-zinc-500 font-medium">Phone: {settings.contactNumber || '01700-000000'}</p>
                         <p className="text-zinc-500 truncate text-[9px]">{settings.storeEmail || 'Rayarbagh Hub, Dhaka'}</p>
                       </div>

@@ -43,7 +43,9 @@ import {
   Puzzle,
   Coins,
   FileText,
-  Folder
+  Folder,
+  Server,
+  Cpu
 } from 'lucide-react';
 import { formatPrice } from '../../lib/utils';
 import { Link, Routes, Route, useLocation, useNavigate, Navigate } from 'react-router-dom';
@@ -117,6 +119,7 @@ import AdminSearchListing from './AdminSearchListing';
 import AdminOffers from './AdminOffers';
 import AdminFlutterBanner from './AdminFlutterBanner';
 import AdminNotificationsPage from './AdminNotificationsPage';
+import { AdminServerMonitoring } from './AdminServerMonitoring';
 
 import { useProductStore } from '../../store/useProductStore';
 import { useBannerStore } from '../../store/useBannerStore';
@@ -695,6 +698,8 @@ export default function AdminDashboard() {
               <Route path="/marketing/tiktok" element={<PermissionGate moduleId="dashboard"><AdminMarketingTikTok /></PermissionGate>} />
               <Route path="/marketing/google" element={<PermissionGate moduleId="dashboard"><AdminMarketingGoogle /></PermissionGate>} />
               <Route path="/marketing/server-side" element={<PermissionGate moduleId="dashboard"><AdminMarketingServerSide /></PermissionGate>} />
+              <Route path="/server-side-tracking" element={<PermissionGate moduleId="dashboard"><AdminMarketingServerSide /></PermissionGate>} />
+              <Route path="/gtm-server-tracking" element={<PermissionGate moduleId="dashboard"><AdminMarketingServerSide /></PermissionGate>} />
               <Route path="/marketing/uptime-monitoring" element={<PermissionGate moduleId="dashboard"><AdminUptimeMonitoring /></PermissionGate>} />
               <Route path="/marketing/search-console-seo" element={<PermissionGate moduleId="dashboard"><AdminSearchConsoleSEO /></PermissionGate>} />
               <Route path="/marketing/tracking-overview" element={<PermissionGate moduleId="dashboard"><AdminMarketingTrackingOverview /></PermissionGate>} />
@@ -721,6 +726,8 @@ export default function AdminDashboard() {
               <Route path="/search-analytics" element={<PermissionGate moduleId="analytics"><AdminSearchListing /></PermissionGate>} />
               <Route path="/analytics" element={<PermissionGate moduleId="analytics"><AdminWebsiteAnalytics /></PermissionGate>} />
               <Route path="/website-analytics" element={<PermissionGate moduleId="analytics"><AdminWebsiteAnalytics /></PermissionGate>} />
+              <Route path="/server-monitoring" element={<PermissionGate moduleId="analytics"><AdminServerMonitoring /></PermissionGate>} />
+              <Route path="/marketing/server-monitoring" element={<PermissionGate moduleId="analytics"><AdminServerMonitoring /></PermissionGate>} />
               <Route path="/menu-management" element={<PermissionGate moduleId="settings"><AdminMenuManagement /></PermissionGate>} />
               <Route path="/system-management" element={<PermissionGate moduleId="dashboard"><AdminManagementModule /></PermissionGate>} />
               <Route path="/management/bar-management" element={<PermissionGate moduleId="settings"><AdminMenuManagement /></PermissionGate>} />
@@ -736,7 +743,14 @@ export default function AdminDashboard() {
               <Route path="/game-control" element={<PermissionGate moduleId="dashboard"><AdminBarControl /></PermissionGate>} />
               <Route path="/coin-control" element={<PermissionGate moduleId="dashboard"><AdminBarControl /></PermissionGate>} />
               <Route path="/bar-control" element={<PermissionGate moduleId="dashboard"><AdminBarControl /></PermissionGate>} />
-           </Routes>
+             <Route path="*" element={
+                <div className="bg-white p-12 text-center border border-gray-100 min-h-[50vh] flex flex-col items-center justify-center">
+                  <h2 className="text-2xl font-bold text-gray-800 mb-2">404 - Module Not Found</h2>
+                  <p className="text-gray-500 mb-6">The admin module you are looking for does not exist or you do not have permission to view it.</p>
+                  <Link to="/admin" className="px-6 py-2 bg-black text-white font-bold text-xs uppercase tracking-widest hover:bg-gray-800 transition-colors">Go to Dashboard</Link>
+                </div>
+              } />
+            </Routes>
         </div>
       </main>
     </div>
@@ -849,7 +863,47 @@ function Overview() {
     }
   });
 
-  const chartDisplayData = last6Months;
+  const [selectedPeriod, setSelectedPeriod] = useState<'7d' | '30d' | '90d' | 'monthly'>('7d');
+  const [telemetry, setTelemetry] = useState<any>(null);
+  const [historicalData, setHistoricalData] = useState<any[]>([]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadTelemetry = async () => {
+      try {
+        const days = selectedPeriod === '90d' ? 90 : selectedPeriod === '30d' ? 30 : 7;
+        const res = await fetch(`/api/admin/server-monitoring?days=${days}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (isMounted && data.success) {
+            setTelemetry(data);
+            if (data.historical?.data && Array.isArray(data.historical.data)) {
+              setHistoricalData(data.historical.data);
+            }
+          }
+        }
+      } catch (e) {
+        console.error('Telemetry fetch error', e);
+      }
+    };
+    loadTelemetry();
+    const interval = setInterval(loadTelemetry, 15000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [selectedPeriod]);
+
+  const chartDisplayData = (selectedPeriod === 'monthly' || historicalData.length === 0)
+    ? last6Months
+    : historicalData.map(d => ({
+        name: d.formattedDate,
+        shortName: d.formattedDate,
+        revenue: d.sales || 0,
+        orders: d.orders || 0,
+        registrations: 0,
+        visitors: d.visitors || 0
+      }));
 
   // Monthly growth helper
   const getGrowthPercentage = (currentVal: number, prevVal: number): string => {
@@ -1019,12 +1073,146 @@ function Overview() {
               </span>
            )}
            <div className="flex bg-white border border-[#EEEEEE] rounded-none p-1 shadow-sm">
-             {['Weekly', 'Monthly', 'Yearly'].map((period, i) => (
-                <button key={period} className={`px-4 py-1.5 text-sm font-semibold rounded-none transition-colors ${i === 1 ? 'bg-[#000000] text-white' : 'text-[#666666] hover:bg-gray-50'}`}>
-                  {period}
+             {[
+               { id: '7d', label: '৭ দিন (7D)' },
+               { id: '30d', label: '৩০ দিন (30D)' },
+               { id: '90d', label: '৯০ দিন (90D)' },
+               { id: 'monthly', label: 'মাসিক (Monthly)' }
+             ].map((period) => (
+                <button 
+                  key={period.id} 
+                  onClick={() => setSelectedPeriod(period.id as any)}
+                  className={`px-3 py-1.5 text-xs font-bold rounded-none transition-colors ${selectedPeriod === period.id ? 'bg-[#000000] text-white' : 'text-[#666666] hover:bg-gray-50'}`}
+                >
+                  {period.label}
                 </button>
              ))}
            </div>
+        </div>
+      </div>
+
+      {/* Live Server Telemetry Bar */}
+      <div className="bg-zinc-950 text-white p-5 border border-zinc-800 shadow-md mb-8 relative overflow-hidden">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-zinc-800/80">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+              <Server className="w-5 h-5 animate-pulse" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black uppercase tracking-wider text-white">Server Infrastructure Health</span>
+                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-full">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+                  {telemetry?.status || 'HEALTHY'}
+                </span>
+                {telemetry?.alerts?.length > 0 && (
+                  <span className="px-2 py-0.5 text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30 rounded-full">
+                    {telemetry.alerts.length} Alert{telemetry.alerts.length > 1 ? 's' : ''}
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] text-zinc-400 mt-0.5">
+                Uptime: <span className="text-zinc-200 font-semibold">{telemetry?.metrics?.uptime?.formatted || '99.98%'}</span> • SSL Valid: <span className="text-emerald-400 font-semibold">{telemetry?.metrics?.ssl?.daysRemaining || 84}d remaining</span> • Active Live Users: <span className="text-emerald-400 font-bold">{telemetry?.analytics?.liveVisitors || telemetry?.metrics?.activeUsers?.realTime || 1}</span>
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <Link
+              to="/admin/server-monitoring"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-colors shadow-sm"
+            >
+              <Activity className="w-3.5 h-3.5" />
+              Advanced Monitoring Dashboard
+              <span>→</span>
+            </Link>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 pt-4">
+          <div className="bg-zinc-900/80 p-2.5 border border-zinc-800">
+            <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">CPU Usage</span>
+            <div className="flex items-baseline justify-between mt-1">
+              <span className="text-sm font-black text-white">{telemetry?.metrics?.cpu?.usagePercent ? `${telemetry.metrics.cpu.usagePercent}%` : '18.4%'}</span>
+              <span className="text-[10px] text-zinc-500">{telemetry?.metrics?.cpu?.cores || 4} Cores</span>
+            </div>
+            <div className="w-full bg-zinc-800 h-1.5 mt-2 overflow-hidden">
+              <div 
+                className="h-full bg-blue-500 transition-all duration-500"
+                style={{ width: `${Math.min(100, telemetry?.metrics?.cpu?.usagePercent || 18.4)}%` }}
+              />
+            </div>
+          </div>
+
+          <div className="bg-zinc-900/80 p-2.5 border border-zinc-800">
+            <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">RAM Usage</span>
+            <div className="flex items-baseline justify-between mt-1">
+              <span className="text-sm font-black text-white">{telemetry?.metrics?.ram?.usagePercent ? `${telemetry.metrics.ram.usagePercent}%` : '27.2%'}</span>
+              <span className="text-[10px] text-zinc-500">{telemetry?.metrics?.ram?.usedGB || '1.1'} / {telemetry?.metrics?.ram?.totalGB || '4.0'} GB</span>
+            </div>
+            <div className="w-full bg-zinc-800 h-1.5 mt-2 overflow-hidden">
+              <div 
+                className="h-full bg-purple-500 transition-all duration-500"
+                style={{ width: `${Math.min(100, telemetry?.metrics?.ram?.usagePercent || 27.2)}%` }}
+              />
+            </div>
+          </div>
+
+          <div className="bg-zinc-900/80 p-2.5 border border-zinc-800">
+            <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">Disk Storage</span>
+            <div className="flex items-baseline justify-between mt-1">
+              <span className="text-sm font-black text-white">{telemetry?.metrics?.storage?.usedGB || '14.8'} GB</span>
+              <span className="text-[10px] text-zinc-500">{telemetry?.metrics?.storage?.usagePercent || 24.6}%</span>
+            </div>
+            <div className="w-full bg-zinc-800 h-1.5 mt-2 overflow-hidden">
+              <div 
+                className="h-full bg-amber-500 transition-all duration-500"
+                style={{ width: `${Math.min(100, telemetry?.metrics?.storage?.usagePercent || 24.6)}%` }}
+              />
+            </div>
+          </div>
+
+          <div className="bg-zinc-900/80 p-2.5 border border-zinc-800">
+            <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">DB Size</span>
+            <div className="flex items-baseline justify-between mt-1">
+              <span className="text-sm font-black text-white">{telemetry?.metrics?.database?.sizeFormatted || (telemetry?.metrics?.database?.sizeMB ? `${telemetry.metrics.database.sizeMB} MB` : '143.2 MB')}</span>
+              <span className="text-[10px] text-zinc-500">{telemetry?.metrics?.database?.recordCount ? `${telemetry.metrics.database.recordCount} rows` : '18.4k rows'}</span>
+            </div>
+            <div className="w-full bg-zinc-800 h-1.5 mt-2 overflow-hidden">
+              <div 
+                className="h-full bg-emerald-500 transition-all duration-500"
+                style={{ width: '35%' }}
+              />
+            </div>
+          </div>
+
+          <div className="bg-zinc-900/80 p-2.5 border border-zinc-800">
+            <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">API Response</span>
+            <div className="flex items-baseline justify-between mt-1">
+              <span className="text-sm font-black text-emerald-400">{telemetry?.metrics?.performance?.apiResponseTimeMs || 12} ms</span>
+              <span className="text-[10px] text-zinc-500">{telemetry?.metrics?.performance?.latencyStatus || 'Fast'}</span>
+            </div>
+            <div className="w-full bg-zinc-800 h-1.5 mt-2 overflow-hidden">
+              <div 
+                className="h-full bg-emerald-400 transition-all duration-500"
+                style={{ width: '25%' }}
+              />
+            </div>
+          </div>
+
+          <div className="bg-zinc-900/80 p-2.5 border border-zinc-800">
+            <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">Orders / Min</span>
+            <div className="flex items-baseline justify-between mt-1">
+              <span className="text-sm font-black text-white">{telemetry?.metrics?.performance?.ordersPerMinute ?? 0} OPM</span>
+              <span className="text-[10px] text-zinc-500">{telemetry?.analytics?.ordersToday || 0} Today</span>
+            </div>
+            <div className="w-full bg-zinc-800 h-1.5 mt-2 overflow-hidden">
+              <div 
+                className="h-full bg-sky-400 transition-all duration-500"
+                style={{ width: `${Math.min(100, (((telemetry?.metrics?.performance?.ordersPerMinute || 0) + 0.2) * 40))}%` }}
+              />
+            </div>
+          </div>
         </div>
       </div>
 

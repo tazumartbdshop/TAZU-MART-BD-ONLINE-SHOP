@@ -101,7 +101,7 @@ export const INITIAL_SUPABASE_PRODUCTS = [
     "isNew": true,
     "brand": "PAIDAGOR",
     "status": "active",
-    "description": "​Tazu Mart BD Luxury Emerald Green & Rose Gold Quartz Watch – প্রিমিয়াম লাইফস্টাইলের এক অনন্য প্রতীক\n​একটি আকর্ষণীয় ঘড়ি আপনার সাধারণ পোশাককেও অসাধারণ করে তুলতে পারে। 1000052938.png ছবিতে থাকা Tazu Mart BD Premium Quartz Watch ঠিক তেমনই একটি আভিজাত্যপূর্ণ টাইমপিস। এর ডিপ এমারেল্ড গ্রিন ডায়াল এবং রোজ গোল্ডের লাক্সারি টাচ আধুনিক পুরুষদের ফ্যাশন সেন্সকে এক নতুন উচ্চতায় নিয়ে যাবে।\n​রাজকীয় ডিজাইন ও কালার কম্বিনেশন\n​এই ঘড়ির মূল সৌন্দর্য লুকিয়ে আছে এর কালার প্যালেটে। এর Sunburst Emerald Green Dial আলোর নিচে অসাধারণ রিফ্লেকশন তৈরি করে। ডায়ালের চারপাশের Rose Gold Bezel এবং ভেতরের গোল্ডেন মার্কার ও হ্যান্ডসগুলো ঘড়িটিকে অত্যন্ত গর্জিয়াস ও এক্সক্লুসিভ লুক দেয়। এর বডি এবং চেইনটি তৈরি করা হয়েছে হাই-গ্রেড Stainless Steel দিয়ে, যা প্রিমিয়াম সিলভার ফিনিশিং যুক্ত এবং সম্পূর্ণ জং-রোধক (Rust-resistant)।\n​চমৎকার কার্যকারিতা ও পারফরম্যান্স\n​সৌন্দর্যের পাশাপাশি ঘড়িটির পারফরম্যান্সও দুর্দান্ত। এর ভেতরে থাকা উন্নত প্রযুক্তির Quartz Movement একদম নিখুঁত সময় (Accurate Timekeeping) নিশ্চিত করে। ঘড়ির ৩ টার দিকে রয়েছে একটি ডেডিকেটেড Day and Date Display, যার মাধ্যমে আপনি খুব সহজেই দিন ও তারিখ দেখে নিতে পারবেন।\n​কেন এই ঘড়িটি বেস্ট-সেলার হবে?\n​সবুজ এবং রোজ গোল্ডের এই রেয়ার কম্বিনেশনটি বর্তমানে ঘড়ির বাজারে অত্যন্ত ট্রেন্ডি। যেকোনো কর্পোরেট মিটিং, বিয়ে বা উৎসবের অনুষ্ঠানে এই ঘড়িটি আপনাকে সবার মাঝে আকর্ষণীয় করে তুলবে। আপনার ওয়েবসাইটের কাস্টমাররা যারা কম বাজেটে একদম প্রিমিয়াম ও ইউনিক ডিজাইনের ঘড়ি খুঁজছেন, তাদের জন্য এটি হবে প্রথম পছন্দ।",
+    "description": "​IYABD Luxury Emerald Green & Rose Gold Quartz Watch – প্রিমিয়াম লাইফস্টাইলের এক অনন্য প্রতীক\n​একটি আকর্ষণীয় ঘড়ি আপনার সাধারণ পোশাককেও অসাধারণ করে তুলতে পারে। 1000052938.png ছবিতে থাকা IYABD Premium Quartz Watch ঠিক তেমনই একটি আভিজাত্যপূর্ণ টাইমপিস। এর ডিপ এমারেল্ড গ্রিন ডায়াল এবং রোজ গোল্ডের লাক্সারি টাচ আধুনিক পুরুষদের ফ্যাশন সেন্সকে এক নতুন উচ্চতায় নিয়ে যাবে।\n​রাজকীয় ডিজাইন ও কালার কম্বিনেশন\n​এই ঘড়ির মূল সৌন্দর্য লুকিয়ে আছে এর কালার প্যালেটে। এর Sunburst Emerald Green Dial আলোর নিচে অসাধারণ রিফ্লেকশন তৈরি করে। ডায়ালের চারপাশের Rose Gold Bezel এবং ভেতরের গোল্ডেন মার্কার ও হ্যান্ডসগুলো ঘড়িটিকে অত্যন্ত গর্জিয়াস ও এক্সক্লুসিভ লুক দেয়। এর বডি এবং চেইনটি তৈরি করা হয়েছে হাই-গ্রেড Stainless Steel দিয়ে, যা প্রিমিয়াম সিলভার ফিনিশিং যুক্ত এবং সম্পূর্ণ জং-রোধক (Rust-resistant)।\n​চমৎকার কার্যকারিতা ও পারফরম্যান্স\n​সৌন্দর্যের পাশাপাশি ঘড়িটির পারফরম্যান্সও দুর্দান্ত। এর ভেতরে থাকা উন্নত প্রযুক্তির Quartz Movement একদম নিখুঁত সময় (Accurate Timekeeping) নিশ্চিত করে। ঘড়ির ৩ টার দিকে রয়েছে একটি ডেডিকেটেড Day and Date Display, যার মাধ্যমে আপনি খুব সহজেই দিন ও তারিখ দেখে নিতে পারবেন।\n​কেন এই ঘড়িটি বেস্ট-সেলার হবে?\n​সবুজ এবং রোজ গোল্ডের এই রেয়ার কম্বিনেশনটি বর্তমানে ঘড়ির বাজারে অত্যন্ত ট্রেন্ডি। যেকোনো কর্পোরেট মিটিং, বিয়ে বা উৎসবের অনুষ্ঠানে এই ঘড়িটি আপনাকে সবার মাঝে আকর্ষণীয় করে তুলবে। আপনার ওয়েবসাইটের কাস্টমাররা যারা কম বাজেটে একদম প্রিমিয়াম ও ইউনিক ডিজাইনের ঘড়ি খুঁজছেন, তাদের জন্য এটি হবে প্রথম পছন্দ।",
     "buyingPrice": 440,
     "soldCount": 1001,
     "is_flash_sale": false,
@@ -223,9 +223,9 @@ export const INITIAL_SUPABASE_PRODUCTS = [
     "rating": 4.8,
     "reviews": 12,
     "isNew": true,
-    "brand": "TAZU LUXURIOUS CLOCK",
+    "brand": "IYABD LUXURIOUS CLOCK",
     "status": "active",
-    "description": "Tazu Luxurious Clock is a premium wall clock brand dedicated to delivering elegant, modern, and luxury wall clocks for every home and office. Our carefully selected collection combines superior craftsmanship, premium materials, and stylish designs to create decorative timepieces that perfectly complement contemporary, classic, and minimalist interiors.<div><br><div>Whether you're decorating your living room, bedroom, dining area, office, hotel, café, or commercial space, Tazu Luxurious Clock offers the perfect wall clock to match your style. Each clock is designed with precision movement for accurate timekeeping, durable construction for long-lasting performance, and premium finishes that add a sophisticated touch to any wall.</div><div><br></div><div>Our collection includes modern wall clocks, luxury metal wall clocks, decorative designer clocks, minimalist clocks, floral wall clocks, and elegant home décor clocks suitable for every interior. Every product is selected to provide exceptional quality, eye-catching aesthetics, and lasting value.</div><div><br></div><div>Choose Tazu Luxurious Clock for premium design, reliable quality, and timeless elegance. Elevate your space with luxury wall clocks that make every wall more beautiful while delivering dependable performance every day.</div></div>",
+    "description": "IYABD Luxurious Clock is a premium wall clock brand dedicated to delivering elegant, modern, and luxury wall clocks for every home and office. Our carefully selected collection combines superior craftsmanship, premium materials, and stylish designs to create decorative timepieces that perfectly complement contemporary, classic, and minimalist interiors.<div><br><div>Whether you're decorating your living room, bedroom, dining area, office, hotel, café, or commercial space, IYABD Luxurious Clock offers the perfect wall clock to match your style. Each clock is designed with precision movement for accurate timekeeping, durable construction for long-lasting performance, and premium finishes that add a sophisticated touch to any wall.</div><div><br></div><div>Our collection includes modern wall clocks, luxury metal wall clocks, decorative designer clocks, minimalist clocks, floral wall clocks, and elegant home décor clocks suitable for every interior. Every product is selected to provide exceptional quality, eye-catching aesthetics, and lasting value.</div><div><br></div><div>Choose IYABD Luxurious Clock for premium design, reliable quality, and timeless elegance. Elevate your space with luxury wall clocks that make every wall more beautiful while delivering dependable performance every day.</div></div>",
     "buyingPrice": 6800,
     "soldCount": 10,
     "is_flash_sale": false,
@@ -239,11 +239,11 @@ export const INITIAL_SUPABASE_PRODUCTS = [
 ];
 
 export const INITIAL_SUPABASE_SETTINGS = {
-  storeName: "Tazu Mart",
+  storeName: "IYABD",
   currency: "৳",
   currencySymbol: "৳",
   flashSaleEnabled: true,
   flashSaleEndTime: "2026-12-31T23:59:59.000Z",
   contactNumber: "+880 1711223344",
-  email: "admin@tazumartbd.com"
+  email: "admin@iyabd.com"
 };

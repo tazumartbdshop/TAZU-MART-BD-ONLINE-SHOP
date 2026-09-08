@@ -272,7 +272,7 @@ class AnalyticsEngine {
         userName: sessionData.userName || null,
         isLoggedIn: !!sessionData.userId,
         currentPath: sessionData.currentPath,
-        pageTitle: sessionData.pageTitle || 'TAZU MART BD',
+        pageTitle: sessionData.pageTitle || 'IYABD',
         device: sessionData.device || 'Desktop',
         ip: sessionData.ip || 'Unknown',
         firstSeen: now,

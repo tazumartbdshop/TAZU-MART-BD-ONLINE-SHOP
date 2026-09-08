@@ -21,13 +21,13 @@ function AdminProductList() {
   const categories = ['All', ...Array.from(new Set(categoryList.map(c => c.name)))];
 
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>(() => {
-    return (localStorage.getItem('tazu_admin_product_sort') as 'newest' | 'oldest') || 'newest';
+    return (localStorage.getItem('iyabd_admin_product_sort') as 'newest' | 'oldest') || 'newest';
   });
 
   const toggleSort = () => {
     const next = sortOrder === 'newest' ? 'oldest' : 'newest';
     setSortOrder(next);
-    localStorage.setItem('tazu_admin_product_sort', next);
+    localStorage.setItem('iyabd_admin_product_sort', next);
   };
 
   const showToast = (msg: string) => {
@@ -75,7 +75,7 @@ function AdminProductList() {
           <div>
             <h3 className="text-xl sm:text-2xl font-black text-[#0a0a0a] uppercase tracking-tighter">Product Listing</h3>
             <div className="text-[10px] text-neutral-400 font-bold uppercase tracking-[0.2em] mt-0.5 flex items-center gap-2">
-              <div className="w-1 h-3 bg-black rounded-full"></div> TAZU INVENTORY & STOCK MANAGEMENT
+              <div className="w-1 h-3 bg-black rounded-full"></div> IYABD INVENTORY & STOCK MANAGEMENT
             </div>
           </div>
         </div>
@@ -88,12 +88,12 @@ function AdminProductList() {
         </Link>
       </div>
 
-      {/* STATISTICS CARDS - Full width 2-column grid, TAZU branding, equal height & width */}
+      {/* STATISTICS CARDS - Full width 2-column grid, IYABD branding, equal height & width */}
       <div className="grid grid-cols-2 gap-3 sm:gap-4 w-full">
         {/* CARD 1: Total Products */}
         <div className="bg-white border border-zinc-200 p-3.5 sm:p-5 rounded-none flex items-center justify-between group hover:border-black transition-all shadow-sm">
           <div className="flex flex-col min-w-0 pr-2">
-            <span className="text-[8px] sm:text-[9px] font-black text-black uppercase tracking-[0.2em]">TAZU INVENTORY</span>
+            <span className="text-[8px] sm:text-[9px] font-black text-black uppercase tracking-[0.2em]">IYABD INVENTORY</span>
             <span className="text-[10px] sm:text-xs font-black text-zinc-600 uppercase tracking-tight truncate mt-0.5">Total Products</span>
           </div>
           <div className="text-xl sm:text-2xl font-black text-black bg-zinc-50 border border-zinc-200 px-3 py-1 font-mono shrink-0">
@@ -104,7 +104,7 @@ function AdminProductList() {
         {/* CARD 2: Published Products */}
         <div className="bg-white border border-zinc-200 p-3.5 sm:p-5 rounded-none flex items-center justify-between group hover:border-black transition-all shadow-sm">
           <div className="flex flex-col min-w-0 pr-2">
-            <span className="text-[8px] sm:text-[9px] font-black text-emerald-600 uppercase tracking-[0.2em]">TAZU COMMERCE</span>
+            <span className="text-[8px] sm:text-[9px] font-black text-emerald-600 uppercase tracking-[0.2em]">IYABD COMMERCE</span>
             <span className="text-[10px] sm:text-xs font-black text-zinc-600 uppercase tracking-tight truncate mt-0.5">Published Products</span>
           </div>
           <div className="text-xl sm:text-2xl font-black text-emerald-600 bg-emerald-50/50 border border-emerald-200 px-3 py-1 font-mono shrink-0">
@@ -1135,7 +1135,7 @@ function AdminProductAdd() {
                            name="brand" 
                            type="text" 
                            defaultValue={editingProduct?.brand || ''}
-                           placeholder="e.g. Tazu Classic" 
+                           placeholder="e.g. IYABD Classic" 
                            className="w-full h-12 px-4 bg-zinc-50 border border-zinc-200 rounded-none focus:outline-none focus:border-black transition-colors font-bold text-sm" 
                         />
                      </div>

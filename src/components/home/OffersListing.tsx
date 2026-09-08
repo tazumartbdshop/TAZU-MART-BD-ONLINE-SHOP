@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '../../lib/utils';
+import { campaignService } from '../../services/campaignService';
 
 export default function OffersListing() {
   const categories = [
@@ -76,7 +77,12 @@ export default function OffersListing() {
               <h2 className="text-sm font-black text-neutral-900 uppercase tracking-[0.2em]">Offers for you</h2>
               <div className="h-0.5 w-10 bg-black mt-1"></div>
            </div>
-           <Link to="/offers" className="text-[10px] font-black uppercase tracking-widest text-neutral-400 hover:text-black transition-colors flex items-center gap-1">
+           <Link 
+             to="/offers" 
+             onMouseEnter={() => campaignService.preloadActiveCampaigns()}
+             onTouchStart={() => campaignService.preloadActiveCampaigns()}
+             className="text-[10px] font-black uppercase tracking-widest text-neutral-400 hover:text-black transition-colors flex items-center gap-1"
+           >
               Explore Hub <ArrowRight className="w-3 h-3" />
            </Link>
         </div>
@@ -87,6 +93,8 @@ export default function OffersListing() {
             <Link
               key={cat.id}
               to={`/offers${cat.hash}`}
+              onMouseEnter={() => campaignService.preloadActiveCampaigns()}
+              onTouchStart={() => campaignService.preloadActiveCampaigns()}
               className={cn(
                 "group flex flex-col items-center justify-center p-5 rounded-2xl border transition-all hover:shadow-lg hover:-translate-y-1 active:scale-95",
                 cat.bg,

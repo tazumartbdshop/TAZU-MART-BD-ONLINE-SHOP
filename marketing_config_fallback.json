@@ -10,5 +10,41 @@
     "browserTracking": true,
     "serverSideTracking": true,
     "active": true
+  },
+  "serverSide": {
+    "active": true,
+    "webGtmContainerId": "GTM-N8V5KL9",
+    "serverGtmContainerId": "GTM-SS9401B",
+    "serverContainerUrl": "https://tracking.mydomain.com",
+    "customTrackingDomain": "tracking.mydomain.com",
+    "firstPartyCookieEnabled": true,
+    "cookieLifetimeDays": 730,
+    "cloudPlatform": "Google Cloud Run (Serverless Container)",
+    "cloudRegion": "asia-southeast1 (Singapore)",
+    "containerDockerImage": "gcr.io/cloud-tagging-10302018/gtm-cloud-image:stable",
+    "ga4MeasurementId": "G-299388147",
+    "ga4ApiSecret": "uVz38_29s84lKm99Z_aaQ",
+    "ga4StreamId": "9281745910",
+    "ga4StreamName": "Web Store Production Stream",
+    "facebookPixelId": "907247645182923",
+    "facebookAccessToken": "EAAUnnZCFhyGIBR86TLl9OxZBZCHEE5bx7IW8hCmivOTv4vCrOfaPla1mWmayHHk6MnZAu4SEJfPVKnZCk2M0o4KP13av3jye3MzKDQgKEj9V9FECqEJbcvOLDNwllGlsT1Q08tCoU3zQ4LAcN2wEEyJ8ZAgcqcNRHqiCEsuwT7wuoqXSLF2JLj09Mizb9o8wZDZD",
+    "facebookDatasetId": "907247645182923",
+    "facebookTestEventCode": "TEST19054",
+    "facebookDeduplicationEnabled": true,
+    "googleAdsConversionId": "AW-1129384756",
+    "googleAdsConversionLabel": "Purchase_Conv_101",
+    "googleAdsEnhancedConversions": true,
+    "supabasePlan": "free",
+    "dbQuotaMB": 500,
+    "storageQuotaMB": 1024,
+    "bandwidthQuotaGB": 50,
+    "lastUpdated": "2026-09-06T13:33:30.252Z"
+  },
+  "google": {
+    "measurementId": "G-299388147",
+    "apiSecret": "uVz38_29s84lKm99Z_aaQ",
+    "conversionId": "AW-1129384756",
+    "conversionLabel": "Purchase_Conv_101",
+    "gtmContainerId": "GTM-N8V5KL9"
   }
 }
