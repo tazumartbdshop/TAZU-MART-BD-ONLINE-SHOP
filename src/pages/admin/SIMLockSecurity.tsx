@@ -17,29 +17,8 @@ import {
 import { useModeratorStore } from '../../store/useModeratorStore';
 import { motion, AnimatePresence } from 'framer-motion';
 
-import SecureLockScreen from '../../components/admin/SecureLockScreen';
-
 export default function SIMLockSecurity() {
-  const { isUnlocked, setUnlocked, sectionPassword } = useModeratorStore();
-
-  const handleUnlock = (password: string) => {
-    if (password === sectionPassword) {
-      setUnlocked(true);
-      return true;
-    }
-    return false;
-  };
-
-  if (!isUnlocked) {
-    return (
-      <SecureLockScreen 
-        title="SIM LOCK SECURITY"
-        subtitle="Protected Security Area • Authorized Access Only"
-        logoSubText="Secure Access Control"
-        onUnlock={handleUnlock}
-      />
-    );
-  }
+  const { sectionPassword } = useModeratorStore();
 
   return (
     <div className="space-y-8 font-sans pb-20">

@@ -15,6 +15,62 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
 const JWT_SECRET = process.env.JWT_SECRET || 'iyabd_hostinger_mysql_secret_2026';
+// RBAC Middleware
+const verifyAdminAccess = (moduleId) => {
+  return async (req, res, next) => {
+    try {
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ error: 'Unauthorized: No token provided' });
+      }
+
+      const token = authHeader.split(' ')[1];
+      const decoded = jwt.verify(token, JWT_SECRET);
+      
+      if (!decoded || !decoded.id) {
+        return res.status(401).json({ error: 'Unauthorized: Invalid token' });
+      }
+
+      // Check account status and role
+      const moderators = await dbSelect('moderators');
+      const mod = moderators.find(m => m.id === decoded.id || m.email === decoded.email);
+
+      if (mod) {
+        if (mod.status === 'Inactive') {
+          return res.status(403).json({ error: 'Account disabled' });
+        }
+        if (mod.role === 'admin' || mod.role === 'super_admin') {
+          return next();
+        }
+        
+        let perms = [];
+        try {
+          perms = Array.isArray(mod.permissions) ? mod.permissions : JSON.parse(mod.permissions);
+        } catch(e) {}
+
+        if (perms.includes('all') || perms.includes(moduleId)) {
+          return next();
+        }
+
+        return res.status(403).json({ error: 'Forbidden: Missing required module permission' });
+      }
+
+      // If not in moderators, check regular users table for super admin
+      const users = await dbSelect('users');
+      const adminUser = users.find(u => u.id === decoded.id || u.email === decoded.email);
+      
+      if (adminUser && adminUser.role === 'admin') {
+        return next();
+      }
+
+      return res.status(403).json({ error: 'Forbidden: Not an admin' });
+    } catch (err) {
+      return res.status(401).json({ error: 'Unauthorized: Invalid or expired token' });
+    }
+  };
+};
+
+
 
 // Configure storage for local uploads
 const storage = multer.diskStorage({
@@ -457,7 +513,7 @@ async function startServer() {
     }
   });
 
-  app.post("/api/products", async (req, res) => {
+  app.post("/api/products", verifyAdminAccess("products"), async (req, res) => {
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
     res.setHeader('X-Backend-API', 'IYABD-NodeJS');
     try {
@@ -492,7 +548,7 @@ async function startServer() {
     }
   });
 
-  app.put("/api/products/:id", async (req, res) => {
+  app.put("/api/products/:id", verifyAdminAccess("products"), async (req, res) => {
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
     res.setHeader('X-Backend-API', 'IYABD-NodeJS');
     try {
@@ -525,7 +581,7 @@ async function startServer() {
     }
   });
 
-  app.delete("/api/products/:id", async (req, res) => {
+  app.delete("/api/products/:id", verifyAdminAccess("products"), async (req, res) => {
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
     res.setHeader('X-Backend-API', 'IYABD-NodeJS');
     try {
@@ -693,6 +749,169 @@ async function startServer() {
       });
     } catch (err: any) {
       res.status(401).json({ error: "Invalid session token" });
+    }
+  });
+
+  // ---------------------------------------------------------------------------
+  // Role-Based Access Control (RBAC) & Moderator Management API Endpoints
+  // ---------------------------------------------------------------------------
+  app.get("/api/admin/moderators", verifyAdminAccess("roles"), async (req, res) => {
+    try {
+      const moderators = await dbSelect('moderators');
+      const sanitized = (moderators || []).map((m: any) => ({
+        id: m.id,
+        name: m.name,
+        email: m.email,
+        phone: m.phone || '',
+        dob: m.dob || '',
+        gender: m.gender || '',
+        role: m.role || 'moderator',
+        status: m.status || 'Active',
+        permissions: Array.isArray(m.permissions)
+          ? m.permissions
+          : (typeof m.permissions === 'string' ? (() => { try { return JSON.parse(m.permissions); } catch { return []; } })() : []),
+        createdAt: m.createdAt || m.created_at || Date.now()
+      }));
+      res.json(sanitized);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || "Failed to fetch moderators" });
+    }
+  });
+
+  app.post("/api/admin/moderators", verifyAdminAccess("roles"), async (req, res) => {
+    try {
+      const { name, email, password, role, permissions, status, phone, dob, gender } = req.body;
+      if (!name || !email || !password) {
+        return res.status(400).json({ error: "Name, email, and password are required" });
+      }
+
+      const existingMods = await dbSelect('moderators');
+      if (existingMods && existingMods.some((m: any) => m.email?.toLowerCase() === email.trim().toLowerCase())) {
+        return res.status(400).json({ error: "A staff account already exists with this Gmail/email address" });
+      }
+
+      const isAlreadyHashed = /^\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}$/.test(password);
+      const hashedPassword = isAlreadyHashed ? password : await bcrypt.hash(password, 10);
+
+      const newId = req.body.id || `mod_${Date.now()}`;
+      const newMod = {
+        id: newId,
+        name,
+        email: email.trim().toLowerCase(),
+        password: hashedPassword,
+        role: role || 'moderator',
+        status: status || 'Active',
+        permissions: Array.isArray(permissions) ? permissions : [],
+        phone: phone || '',
+        dob: dob || '',
+        gender: gender || '',
+        createdAt: Date.now()
+      };
+
+      await dbInsert('moderators', newMod);
+
+      res.status(201).json({
+        success: true,
+        moderator: {
+          ...newMod,
+          password: '••••••••'
+        }
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || "Failed to create moderator" });
+    }
+  });
+
+  app.put("/api/admin/moderators/:id", verifyAdminAccess("roles"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const updates = { ...req.body };
+
+      if (updates.password) {
+        const isAlreadyHashed = /^\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}$/.test(updates.password);
+        if (!isAlreadyHashed) {
+          updates.password = await bcrypt.hash(updates.password, 10);
+        }
+      }
+
+      if (updates.permissions && !Array.isArray(updates.permissions)) {
+        try {
+          updates.permissions = JSON.parse(updates.permissions);
+        } catch {}
+      }
+
+      await dbUpdate('moderators', updates, 'id', id);
+      res.json({ success: true, updated: updates });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || "Failed to update moderator" });
+    }
+  });
+
+  app.delete("/api/admin/moderators/:id", verifyAdminAccess("roles"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      await dbDelete('moderators', 'id', id);
+      res.json({ success: true, message: "Moderator removed successfully" });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || "Failed to delete moderator" });
+    }
+  });
+
+  app.post("/api/admin/moderators/login", async (req, res) => {
+    try {
+      const { email, password } = req.body;
+      if (!email || !password) {
+        return res.status(400).json({ error: "Email and password are required" });
+      }
+
+      const moderators = await dbSelect('moderators');
+      const mod = moderators.find((m: any) => m.email?.toLowerCase() === email.trim().toLowerCase());
+
+      if (!mod) {
+        return res.status(401).json({ error: "Invalid email or password" });
+      }
+
+      if (mod.status === 'Inactive') {
+        return res.status(403).json({ error: "This staff account is currently deactivated. Please contact the primary administrator." });
+      }
+
+      let isMatch = false;
+      if (mod.password) {
+        const isBcrypt = /^\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}$/.test(mod.password);
+        if (isBcrypt) {
+          isMatch = await bcrypt.compare(password, mod.password).catch(() => false);
+        } else {
+          isMatch = password === mod.password;
+        }
+      }
+
+      if (!isMatch) {
+        return res.status(401).json({ error: "Invalid email or password" });
+      }
+
+      const permissions = Array.isArray(mod.permissions)
+        ? mod.permissions
+        : (typeof mod.permissions === 'string' ? (() => { try { return JSON.parse(mod.permissions); } catch { return []; } })() : []);
+
+      const token = jwt.sign(
+        { id: mod.id, email: mod.email, role: mod.role || 'moderator', permissions },
+        JWT_SECRET,
+        { expiresIn: '7d' }
+      );
+
+      res.json({
+        status: 'success',
+        token,
+        user: {
+          id: mod.id,
+          name: mod.name,
+          email: mod.email,
+          role: mod.role || 'moderator',
+          permissions
+        }
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || "Authentication failed" });
     }
   });
 
@@ -2044,19 +2263,58 @@ async function startServer() {
     }
   });
 
+  // Helper to get and save review likes persistently
+  async function getReviewLikesMap(): Promise<Record<string, { count: number; users: string[] }>> {
+    try {
+      const client = supabaseServiceRole || supabaseAdmin;
+      if (client) {
+        const { data } = await client.from('settings').select('value').eq('id', 'review_likes_map').limit(1);
+        if (data && data.length > 0 && data[0].value) {
+          const val = data[0].value;
+          return typeof val === 'string' ? JSON.parse(val) : val;
+        }
+      }
+    } catch (e) {
+      console.warn("Could not fetch review_likes_map from DB:", e);
+    }
+    return {};
+  }
+
+  async function saveReviewLikesMap(map: Record<string, { count: number; users: string[] }>) {
+    try {
+      const client = supabaseServiceRole || supabaseAdmin;
+      if (client) {
+        await client.from('settings').upsert({ id: 'review_likes_map', value: JSON.stringify(map) });
+      }
+    } catch (e) {
+      console.warn("Could not save review_likes_map to DB:", e);
+    }
+  }
+
   // Product Reviews API Endpoint
   app.get("/api/products/:productId/reviews", async (req, res) => {
     try {
-      const { productId } = req.params;
+      let { productId } = req.params;
       const client = supabaseServiceRole || supabaseAdmin;
       if (!client) {
         return res.status(500).json({ error: "Supabase client not initialized" });
       }
 
+      let effectiveProductId = productId;
+      const { data: prodData } = await client
+        .from('products')
+        .select('id, slug')
+        .or(`id.eq.${productId},slug.eq.${productId}`)
+        .limit(1);
+
+      if (prodData && prodData.length > 0) {
+        effectiveProductId = prodData[0].id;
+      }
+
       const { data, error } = await client
         .from('reviews')
         .select('*')
-        .eq('product_id', productId)
+        .eq('product_id', effectiveProductId)
         .eq('status', 'approved')
         .order('created_at', { ascending: false });
 
@@ -2065,7 +2323,39 @@ async function startServer() {
         return res.status(500).json({ error: "Failed to fetch product reviews" });
       }
 
-      res.json(data || []);
+      const likesMap = await getReviewLikesMap();
+
+      const normalized = (data || []).map((r: any) => {
+        let media = [];
+        if (Array.isArray(r.media_urls)) {
+          media = r.media_urls;
+        } else if (typeof r.media_urls === 'string' && r.media_urls.trim()) {
+          try { media = JSON.parse(r.media_urls); } catch { media = []; }
+        }
+        const likeInfo = likesMap[r.id] || { count: 0, users: [] };
+
+        return {
+          id: r.id,
+          product_id: r.product_id,
+          customer_name: r.customer_name,
+          user_id: r.user_id,
+          rating: Number(r.rating) || 5,
+          review_text: r.review_text,
+          status: r.status,
+          verified: r.verified === true || r.verified === 'true' || r.verified === 1 || r.verified === '1',
+          anonymous: r.anonymous === true || r.anonymous === 'true' || r.anonymous === 1 || r.anonymous === '1',
+          is_pinned: r.is_pinned === true || r.is_pinned === 'true' || r.is_pinned === 1 || r.is_pinned === '1',
+          created_at: r.created_at,
+          media_urls: Array.isArray(media) ? media : [],
+          phone: r.phone,
+          email: r.email,
+          order_id: r.order_id,
+          admin_reply: r.admin_reply,
+          likes_count: likeInfo.count || 0
+        };
+      });
+
+      res.json(normalized);
     } catch (err: any) {
       console.error("Product reviews endpoint error:", err);
       res.status(500).json({ error: "Failed to fetch product reviews" });
@@ -2081,11 +2371,26 @@ async function startServer() {
       }
 
       const client = supabaseServiceRole || supabaseAdmin;
-      const { data, error } = client ? await client
+      if (!client) {
+        return res.status(500).json({ error: "Client uninitialized" });
+      }
+
+      let effectiveProductId = productId;
+      const { data: prodData } = await client
+        .from('products')
+        .select('id, slug')
+        .or(`id.eq.${productId},slug.eq.${productId}`)
+        .limit(1);
+
+      if (prodData && prodData.length > 0) {
+        effectiveProductId = prodData[0].id;
+      }
+
+      const { data, error } = await client
         .from('reviews')
         .select('*')
-        .eq('product_id', productId)
-        .eq('status', 'approved') : { data: null, error: 'Client uninitialized' };
+        .eq('product_id', effectiveProductId)
+        .eq('status', 'approved');
 
       if (error) {
         console.error("Error fetching reviews for summary from Supabase:", error);
@@ -2094,30 +2399,152 @@ async function startServer() {
 
       const total_reviews = data ? data.length : 0;
       const average_rating = total_reviews > 0
-        ? Number((data.reduce((sum: number, r: any) => sum + r.rating, 0) / total_reviews).toFixed(1))
+        ? Number((data.reduce((sum: number, r: any) => sum + (Number(r.rating) || 5), 0) / total_reviews).toFixed(1))
         : 0;
-      const total_verified_reviews = data ? data.filter((r: any) => r.verified === true || r.verified === 1).length : 0;
+      const total_verified_reviews = data ? data.filter((r: any) => 
+        r.verified === true || r.verified === 'true' || r.verified === 1 || r.verified === '1'
+      ).length : 0;
 
-      const rating_breakdown = { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0 };
+      const rating_breakdown: Record<string, number> = { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0 };
+      const customer_photos: string[] = [];
+
       if (data) {
         data.forEach((r: any) => {
-          const key = String(r.rating) as "1" | "2" | "3" | "4" | "5";
-          if (rating_breakdown[key] !== undefined) {
-            rating_breakdown[key]++;
+          const ratingNum = Math.min(5, Math.max(1, Math.round(Number(r.rating) || 5)));
+          const key = String(ratingNum) as "1" | "2" | "3" | "4" | "5";
+          rating_breakdown[key] = (rating_breakdown[key] || 0) + 1;
+
+          let media = [];
+          if (Array.isArray(r.media_urls)) {
+            media = r.media_urls;
+          } else if (typeof r.media_urls === 'string' && r.media_urls.trim()) {
+            try { media = JSON.parse(r.media_urls); } catch { media = []; }
+          }
+          if (Array.isArray(media)) {
+            media.forEach((url: string) => {
+              if (url && typeof url === 'string' && !url.toLowerCase().endsWith('.mp4')) {
+                customer_photos.push(url);
+              }
+            });
           }
         });
       }
 
       res.json({
-        product_id: productId,
+        product_id: effectiveProductId,
         average_rating,
         total_reviews,
         total_verified_reviews,
-        rating_breakdown
+        rating_breakdown,
+        customer_photos_count: customer_photos.length,
+        customer_photos: customer_photos.slice(0, 16)
       });
     } catch (err: any) {
       console.error("Reviews summary endpoint error:", err);
       res.status(500).json({ error: "Failed to fetch review summary" });
+    }
+  });
+
+  // Get Likes status for a product or review
+  app.get("/api/reviews/likes", async (req, res) => {
+    try {
+      const userId = (req.query.userId || req.query.user_id) as string;
+      const likesMap = await getReviewLikesMap();
+      const userLikes: string[] = [];
+      const likesCountMap: Record<string, number> = {};
+
+      Object.entries(likesMap).forEach(([reviewId, info]) => {
+        likesCountMap[reviewId] = info.count || 0;
+        if (userId && Array.isArray(info.users) && info.users.includes(userId)) {
+          userLikes.push(reviewId);
+        }
+      });
+
+      res.json({ likesCountMap, userLikes });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Toggle Like on a review (Atomic +1 / -1)
+  app.post("/api/reviews/:reviewId/like", async (req, res) => {
+    try {
+      const { reviewId } = req.params;
+      const { userId } = req.body;
+      const effectiveUserId = userId || req.ip || 'guest';
+
+      const likesMap = await getReviewLikesMap();
+      if (!likesMap[reviewId]) {
+        likesMap[reviewId] = { count: 0, users: [] };
+      }
+
+      const reviewLikes = likesMap[reviewId];
+      if (!Array.isArray(reviewLikes.users)) {
+        reviewLikes.users = [];
+      }
+
+      const hasLiked = reviewLikes.users.includes(effectiveUserId);
+      let isLiked = false;
+
+      if (hasLiked) {
+        // Toggle OFF: -1
+        reviewLikes.users = reviewLikes.users.filter(u => u !== effectiveUserId);
+        reviewLikes.count = Math.max(0, (reviewLikes.count || 1) - 1);
+        isLiked = false;
+      } else {
+        // Toggle ON: +1
+        reviewLikes.users.push(effectiveUserId);
+        reviewLikes.count = (reviewLikes.count || 0) + 1;
+        isLiked = true;
+      }
+
+      likesMap[reviewId] = reviewLikes;
+      await saveReviewLikesMap(likesMap);
+
+      res.json({
+        success: true,
+        reviewId,
+        likeCount: reviewLikes.count,
+        isLiked
+      });
+    } catch (err: any) {
+      console.error("Error toggling like:", err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Recalculate and synchronize product review stats in database
+  app.post("/api/reviews/recalculate/:productId", async (req, res) => {
+    try {
+      const { productId } = req.params;
+      const client = supabaseServiceRole || supabaseAdmin;
+      if (!client) return res.status(500).json({ error: "DB uninitialized" });
+
+      const { data: approvedReviews, error: rError } = await client
+        .from('reviews')
+        .select('*')
+        .eq('product_id', productId)
+        .eq('status', 'approved');
+
+      if (rError) throw rError;
+
+      const total = approvedReviews ? approvedReviews.length : 0;
+      const avg = total > 0
+        ? Number((approvedReviews.reduce((sum: number, r: any) => sum + (Number(r.rating) || 5), 0) / total).toFixed(1))
+        : 0;
+
+      const { error: pError } = await client
+        .from('products')
+        .update({ rating: avg, reviews: total })
+        .eq('id', productId);
+
+      if (pError) console.error("Error updating product rating/reviews:", pError);
+
+      invalidateHomepageCache();
+
+      res.json({ success: true, productId, totalReviews: total, averageRating: avg });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
     }
   });
 
@@ -3576,7 +4003,7 @@ Please ask me your query or select a quick question template below!`;
   });
 
   // Update order status strictly by unique database ID
-  app.post("/api/orders/update-status", async (req, res) => {
+  app.post("/api/orders/update-status", verifyAdminAccess("orders"), async (req, res) => {
     try {
       res.setHeader('Content-Type', 'application/json');
       const clientToUse = supabaseServiceRole || supabaseAdmin;
@@ -3685,7 +4112,7 @@ Please ask me your query or select a quick question template below!`;
   });
 
   // Delete order strictly by unique database ID
-  app.post("/api/orders/delete", async (req, res) => {
+  app.post("/api/orders/delete", verifyAdminAccess("orders"), async (req, res) => {
     try {
       res.setHeader('Content-Type', 'application/json');
       const clientToUse = supabaseServiceRole || supabaseAdmin;

@@ -31,7 +31,7 @@ export default function ReviewDetails() {
         </div>
       </div>
 
-      <ProductReviews />
+      <ProductReviews productId={product?.id} productSlug={product?.slug || urlParam} />
     </div>
   );
 }

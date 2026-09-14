@@ -23,6 +23,18 @@ export interface ProductReview {
   anonymous?: boolean;
   isPinned?: boolean;
   rejectionReason?: string;
+  likesCount?: number;
+  userLiked?: boolean;
+}
+
+export interface ReviewSummaryData {
+  product_id: string;
+  average_rating: number;
+  total_reviews: number;
+  total_verified_reviews: number;
+  rating_breakdown: Record<string, number>;
+  customer_photos_count?: number;
+  customer_photos?: string[];
 }
 
 export interface ReviewNotification {
@@ -35,12 +47,15 @@ export interface ReviewNotification {
 
 interface ReviewState {
   reviews: ProductReview[];
+  reviewSummary: ReviewSummaryData | null;
   notifications: ReviewNotification[];
   isLoading: boolean;
   
   // Actions
   fetchReviews: (silent?: boolean) => Promise<void>;
   fetchReviewsForProduct: (productId: string) => Promise<void>;
+  fetchReviewSummary: (productId: string) => Promise<ReviewSummaryData | null>;
+  toggleLike: (reviewId: string, userId?: string) => Promise<{ likeCount: number; isLiked: boolean } | null>;
   recalculateProductStats: (productId: string) => Promise<void>;
   addReview: (review: Omit<ProductReview, 'reviewId' | 'createdAt' | 'status'> & { status?: 'pending' | 'approved' | 'hidden' | 'rejected', createdAt?: string }) => Promise<void>;
   updateReview: (reviewId: string, updates: Partial<Omit<ProductReview, 'reviewId' | 'productId' | 'customerId' | 'createdAt'>>) => Promise<void>;
@@ -58,6 +73,7 @@ interface ReviewState {
 
 export const useReviewStore = create<ReviewState>((set, get) => ({
   reviews: [],
+  reviewSummary: null,
   notifications: [],
   isLoading: false,
 
@@ -71,26 +87,36 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
 
       if (error) throw error;
 
-      const formattedReviews: ProductReview[] = (data || []).map(r => ({
-        reviewId: r.id,
-        productId: r.product_id,
-        customerId: r.user_id,
-        customerName: r.customer_name,
-        rating: r.rating,
-        reviewText: r.review_text,
-        mediaUrls: r.media_urls || [],
-        adminReply: r.admin_reply,
-        status: r.status,
-        verified: r.verified,
-        createdAt: r.created_at,
-        phone: r.phone,
-        email: r.email,
-        orderId: r.order_id,
-        deviceIP: r.device_ip,
-        anonymous: r.anonymous,
-        isPinned: r.is_pinned,
-        rejectionReason: r.rejection_reason
-      }));
+      const formattedReviews: ProductReview[] = (data || []).map(r => {
+        let media = [];
+        if (Array.isArray(r.media_urls)) {
+          media = r.media_urls;
+        } else if (typeof r.media_urls === 'string' && r.media_urls.trim()) {
+          try { media = JSON.parse(r.media_urls); } catch { media = []; }
+        }
+
+        return {
+          reviewId: r.id,
+          productId: r.product_id,
+          customerId: r.user_id,
+          customerName: r.customer_name || 'Customer',
+          rating: Number(r.rating) || 5,
+          reviewText: r.review_text || '',
+          mediaUrls: Array.isArray(media) ? media : [],
+          adminReply: r.admin_reply,
+          status: r.status,
+          verified: r.verified === true || r.verified === 'true' || r.verified === 1 || r.verified === '1',
+          createdAt: r.created_at,
+          phone: r.phone,
+          email: r.email,
+          orderId: r.order_id,
+          deviceIP: r.device_ip,
+          anonymous: r.anonymous === true || r.anonymous === 'true' || r.anonymous === 1,
+          isPinned: r.is_pinned === true || r.is_pinned === 'true' || r.is_pinned === 1,
+          rejectionReason: r.rejection_reason,
+          likesCount: 0
+        };
+      });
 
       set({ reviews: formattedReviews, isLoading: false });
     } catch (error: any) {
@@ -100,62 +126,124 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
     }
   },
 
+  fetchReviewSummary: async (productId: string) => {
+    try {
+      const response = await fetch(`/api/reviews/summary?productId=${productId}`);
+      if (response.ok) {
+        const summary: ReviewSummaryData = await response.json();
+        set({ reviewSummary: summary });
+        return summary;
+      }
+    } catch (e) {
+      console.error('Failed to fetch review summary:', e);
+    }
+    return null;
+  },
+
+  toggleLike: async (reviewId: string, userId?: string) => {
+    try {
+      const effectiveUser = userId || localStorage.getItem('tm_visitor_id') || `visitor_${Math.random().toString(36).substring(2, 9)}`;
+      if (!localStorage.getItem('tm_visitor_id')) {
+        localStorage.setItem('tm_visitor_id', effectiveUser);
+      }
+
+      const res = await fetch(`/api/reviews/${reviewId}/like`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: effectiveUser })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        set(state => ({
+          reviews: state.reviews.map(r => 
+            r.reviewId === reviewId 
+              ? { ...r, likesCount: data.likeCount, userLiked: data.isLiked }
+              : r
+          )
+        }));
+        return { likeCount: data.likeCount, isLiked: data.isLiked };
+      }
+    } catch (e) {
+      console.error('Failed to toggle review like:', e);
+    }
+    return null;
+  },
+
   fetchReviewsForProduct: async (productId: string) => {
     set({ isLoading: true });
     try {
-      const response = await fetch(`/api/products/${productId}/reviews`);
-      if (!response.ok) {
-        const { data, error } = await db
-          .from('reviews')
-          .select('*')
-          .eq('product_id', productId)
-          .eq('status', 'approved')
-          .order('created_at', { ascending: false });
-        if (error) throw error;
-        const formattedReviews: ProductReview[] = (data || []).map(r => ({
+      // Parallel fetch reviews and summary
+      const [revRes, summary] = await Promise.all([
+        fetch(`/api/products/${productId}/reviews`),
+        get().fetchReviewSummary(productId)
+      ]);
+
+      if (revRes.ok) {
+        const data = await revRes.json();
+        const formattedReviews: ProductReview[] = (data || []).map((r: any) => ({
           reviewId: r.id,
           productId: r.product_id,
           customerId: r.user_id,
-          customerName: r.customer_name,
-          rating: r.rating,
-          reviewText: r.review_text,
-          mediaUrls: r.media_urls || [],
+          customerName: r.customer_name || 'Customer',
+          rating: Number(r.rating) || 5,
+          reviewText: r.review_text || '',
+          mediaUrls: Array.isArray(r.media_urls) ? r.media_urls : [],
           adminReply: r.admin_reply,
           status: r.status,
-          verified: r.verified,
+          verified: r.verified === true || r.verified === 'true' || r.verified === 1 || r.verified === '1',
           createdAt: r.created_at,
           phone: r.phone,
           email: r.email,
           orderId: r.order_id,
           deviceIP: r.device_ip,
-          anonymous: r.anonymous,
-          isPinned: r.is_pinned,
-          rejectionReason: r.rejection_reason
+          anonymous: r.anonymous === true || r.anonymous === 'true' || r.anonymous === 1,
+          isPinned: r.is_pinned === true || r.is_pinned === 'true' || r.is_pinned === 1,
+          rejectionReason: r.rejection_reason,
+          likesCount: r.likes_count || 0
         }));
         set({ reviews: formattedReviews, isLoading: false });
         return;
       }
-      const data = await response.json();
-      const formattedReviews: ProductReview[] = (data || []).map((r: any) => ({
-        reviewId: r.id,
-        productId: r.product_id,
-        customerId: r.user_id,
-        customerName: r.customer_name,
-        rating: r.rating,
-        reviewText: r.review_text,
-        mediaUrls: r.media_urls || [],
-        adminReply: r.admin_reply,
-        status: r.status,
-        verified: r.verified,
-        createdAt: r.created_at,
-        phone: r.phone,
-        email: r.email,
-        orderId: r.order_id,
-        deviceIP: r.device_ip,
-        anonymous: r.anonymous,
-        isPinned: r.is_pinned,
-        rejectionReason: r.rejection_reason
-      }));
+
+      // Fallback to Supabase direct query
+      const { data, error } = await db
+        .from('reviews')
+        .select('*')
+        .eq('product_id', productId)
+        .eq('status', 'approved')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      const formattedReviews: ProductReview[] = (data || []).map(r => {
+        let media = [];
+        if (Array.isArray(r.media_urls)) {
+          media = r.media_urls;
+        } else if (typeof r.media_urls === 'string' && r.media_urls.trim()) {
+          try { media = JSON.parse(r.media_urls); } catch { media = []; }
+        }
+        return {
+          reviewId: r.id,
+          productId: r.product_id,
+          customerId: r.user_id,
+          customerName: r.customer_name || 'Customer',
+          rating: Number(r.rating) || 5,
+          reviewText: r.review_text || '',
+          mediaUrls: Array.isArray(media) ? media : [],
+          adminReply: r.admin_reply,
+          status: r.status,
+          verified: r.verified === true || r.verified === 'true' || r.verified === 1 || r.verified === '1',
+          createdAt: r.created_at,
+          phone: r.phone,
+          email: r.email,
+          orderId: r.order_id,
+          deviceIP: r.device_ip,
+          anonymous: r.anonymous === true || r.anonymous === 'true' || r.anonymous === 1,
+          isPinned: r.is_pinned === true || r.is_pinned === 'true' || r.is_pinned === 1,
+          rejectionReason: r.rejection_reason,
+          likesCount: 0
+        };
+      });
       set({ reviews: formattedReviews, isLoading: false });
     } catch (error: any) {
       console.error('Error fetching product reviews:', error);
@@ -163,35 +251,26 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
     }
   },
 
-  // Helper to recalculate product stats
+  // Helper to recalculate product stats and synchronize across stores
   recalculateProductStats: async (productId: string) => {
     try {
-      // 1. Fetch all approved reviews for this product
-      const { data: approvedReviews, error: fetchError } = await db
-        .from('reviews')
-        .select('rating')
-        .eq('product_id', productId)
-        .eq('status', 'approved');
-
-      if (fetchError) throw fetchError;
-
-      const count = approvedReviews?.length || 0;
-      const average = count > 0 
-        ? Number((approvedReviews.reduce((sum, r) => sum + r.rating, 0) / count).toFixed(1))
-        : 4.5; // Default back to 4.5 if no reviews
-
-      // 2. Update product table
-      const { error: updateError } = await db
-        .from('products')
-        .update({
-          rating: average,
-          reviews: count
-        })
-        .eq('id', productId);
-
-      if (updateError) {
-        console.error("Error updating product stats:", updateError);
+      // 1. Call server endpoint to update database products table securely
+      const res = await fetch(`/api/reviews/recalculate/${productId}`, { method: 'POST' });
+      if (res.ok) {
+        const stats = await res.json();
+        // Update product in useProductStore if loaded
+        try {
+          const { useProductStore } = await import('./useProductStore');
+          useProductStore.setState((state) => ({
+            products: state.products.map(p => 
+              p.id === productId ? { ...p, rating: stats.averageRating, reviews: stats.totalReviews } : p
+            )
+          }));
+        } catch {}
       }
+
+      // Also refresh the summary
+      await get().fetchReviewSummary(productId);
     } catch (err) {
       console.error("Failed to recalculate product stats:", err);
     }

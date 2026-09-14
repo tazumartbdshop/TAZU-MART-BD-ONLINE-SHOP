@@ -1,5 +1,9 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import { getDb } from '../lib/db';
+import { hashPassword, isBcryptHash } from '../lib/authCrypto';
+
+export type StaffRole = 'moderator' | 'staff' | 'support';
 
 export interface Moderator {
   id: string;
@@ -8,8 +12,8 @@ export interface Moderator {
   phone?: string;
   dob?: string;
   gender?: 'Male' | 'Female' | '';
-  password: string;
-  role: 'moderator';
+  password: string; // Stored as bcrypt hash
+  role: StaffRole;
   status: 'Active' | 'Inactive';
   permissions: string[];
   createdAt: number;
@@ -22,14 +26,18 @@ interface ModeratorStore {
   sectionPassword: string;
   isLoaded: boolean;
   subscribe: () => () => void;
-  addModerator: (moderator: Omit<Moderator, 'id' | 'createdAt'>) => void;
-  updateModerator: (id: string, updatedModerator: Partial<Moderator>) => void;
-  deleteModerator: (id: string) => void;
+  loadFromBackend: () => Promise<void>;
+  addModerator: (moderator: Omit<Moderator, 'id' | 'createdAt'>) => Promise<Moderator>;
+  updateModerator: (id: string, updatedModerator: Partial<Moderator>) => Promise<void>;
+  deleteModerator: (id: string) => Promise<void>;
   getModeratorByEmail: (email: string) => Moderator | undefined;
   setUnlocked: (v: boolean) => void;
   setSimUnlocked: (v: boolean) => void;
   setSectionPassword: (v: string) => void;
 }
+
+// Pre-hashed bcrypt signature of 'moderator123'
+const DEFAULT_HASH = '$2b$10$oFjwcp8nO.mtU6.3xNRfLOr3wQYFg6YQpa0ebRuoj1JnOCiRX7f9m';
 
 const defaultModerators: Moderator[] = [
   {
@@ -39,11 +47,11 @@ const defaultModerators: Moderator[] = [
     phone: '01711111111',
     dob: '1995-05-15',
     gender: 'Male',
-    password: 'moderator123',
+    password: DEFAULT_HASH,
     role: 'moderator',
     status: 'Active',
-    permissions: ['dashboard', 'orders'],
-    createdAt: Date.now(),
+    permissions: ['dashboard', 'orders', 'delivery'],
+    createdAt: 1740000000000,
   },
   {
     id: 'mod_2',
@@ -52,11 +60,11 @@ const defaultModerators: Moderator[] = [
     phone: '01722222222',
     dob: '1998-08-20',
     gender: 'Female',
-    password: 'moderator123',
+    password: DEFAULT_HASH,
     role: 'moderator',
     status: 'Active',
-    permissions: ['dashboard', 'products', 'categories'],
-    createdAt: Date.now(),
+    permissions: ['dashboard', 'products', 'categories', 'reviews'],
+    createdAt: 1740100000000,
   },
   {
     id: 'mod_3',
@@ -65,11 +73,11 @@ const defaultModerators: Moderator[] = [
     phone: '01733333333',
     dob: '1992-12-10',
     gender: 'Male',
-    password: 'moderator123',
-    role: 'moderator',
+    password: DEFAULT_HASH,
+    role: 'staff',
     status: 'Inactive',
     permissions: ['dashboard', 'analytics'],
-    createdAt: Date.now(),
+    createdAt: 1740200000000,
   },
   {
     id: 'mod_4',
@@ -78,112 +86,134 @@ const defaultModerators: Moderator[] = [
     phone: '01744444444',
     dob: '1997-03-25',
     gender: 'Female',
-    password: 'moderator123',
-    role: 'moderator',
+    password: DEFAULT_HASH,
+    role: 'support',
     status: 'Active',
-    permissions: ['dashboard', 'orders', 'payments'],
-    createdAt: Date.now(),
+    permissions: ['dashboard', 'support', 'reviews', 'orders'],
+    createdAt: 1740300000000,
   }
 ];
 
-export const useModeratorStore = create<ModeratorStore>((set, get) => ({
-  moderators: defaultModerators,
-  isUnlocked: false,
-  isSimUnlocked: false,
-  sectionPassword: 'Aistudio@2026',
-  isLoaded: false,
-  
-  subscribe: () => {
-    const db = getDb();
-    if (!db) return () => {};
+export const useModeratorStore = create<ModeratorStore>()(
+  persist(
+    (set, get) => ({
+      moderators: defaultModerators,
+      isUnlocked: false,
+      isSimUnlocked: false,
+      sectionPassword: 'Aistudio@2026',
+      isLoaded: false,
 
-    const loadMods = async () => {
-        const { data, error } = await db.from('moderators').select('*');
-        if (!error && data && data.length > 0) {
-            set({ moderators: data as Moderator[] });
-        } else if (!error && data && data.length === 0) {
-            db.from('moderators').upsert(defaultModerators).then(({error}) => error && console.warn(error));
-            set({ moderators: defaultModerators });
-        }
-    };
-    
-    const loadSettings = async () => {
-        const { data, error } = await db.from('settings').select('*').eq('id', 'moderatorAuth').limit(1);
-        if (!error && data && data.length > 0) {
-            const dataObj = data[0];
-            if (dataObj.sectionPassword) {
-                set({ sectionPassword: dataObj.sectionPassword, isLoaded: true });
+      loadFromBackend: async () => {
+        try {
+          const res = await fetch('/api/admin/moderators');
+          if (res.ok) {
+            const data = await res.json();
+            if (Array.isArray(data) && data.length > 0) {
+              set({ moderators: data, isLoaded: true });
+              return;
             }
-        } else if (!error && data && data.length === 0) {
-            db.from('settings').upsert([{ id: 'moderatorAuth', sectionPassword: 'Aistudio@2026' }]).then(({error}) => error && console.warn(error));
-            set({ isLoaded: true });
+          }
+        } catch {
+          // fallback to client store
         }
-    };
+      },
 
-    loadMods();
-    loadSettings();
-    
-    const channel1 = db
-      .channel('public:moderators')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'moderators' }, () => {
-         loadMods();
-      })
-      .subscribe();
-      
-    const channel2 = db
-      .channel('public:settings:moderatorAuth')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'settings', filter: 'id=eq.moderatorAuth' }, () => {
-         loadSettings();
-      })
-      .subscribe();
+      subscribe: () => {
+        get().loadFromBackend();
 
-    return () => {
-      db.removeChannel(channel1);
-      db.removeChannel(channel2);
-    };
-  },
+        // Polling as a fallback for real-time (every 30s)
+        const interval = setInterval(() => {
+          get().loadFromBackend();
+        }, 30000);
 
-  setUnlocked: (v) => set({ isUnlocked: v }),
-  setSimUnlocked: (v) => set({ isSimUnlocked: v }),
-  setSectionPassword: (v) => {
-    set({ sectionPassword: v });
-    const db = getDb();
-    if(db) db.from('settings').update({ sectionPassword: v }).eq('id', 'moderatorAuth').then(({error}) => error && console.warn(error));
-  },
+        return () => {
+          clearInterval(interval);
+        };
+      },
 
-  addModerator: (moderator) => {
-    const id = `mod_${Date.now()}`;
-    const newModerator: Moderator = {
-      ...moderator,
-      id,
-      createdAt: Date.now(),
-    };
-    set((state) => ({ moderators: [newModerator, ...state.moderators] }));
-    const db = getDb();
-    if (db) db.from('moderators').insert([newModerator]).then(({error}) => error && console.warn(error));
-  },
+      setUnlocked: (v) => set({ isUnlocked: v }),
+      setSimUnlocked: (v) => set({ isSimUnlocked: v }),
+      setSectionPassword: (v) => {
+        set({ sectionPassword: v });
+      },
 
-  updateModerator: (id, updatedModerator) => {
-    set((state) => ({
-      moderators: state.moderators.map((m) =>
-        m.id === id ? { ...m, ...updatedModerator } : m
-      ),
-    }));
-    const db = getDb();
-    if (db) db.from('moderators').update(updatedModerator).eq('id', id).then(({error}) => error && console.warn(error));
-  },
+      addModerator: async (moderator) => {
+        const id = `mod_${Date.now()}`;
+        const hashedPassword = isBcryptHash(moderator.password)
+          ? moderator.password
+          : hashPassword(moderator.password);
 
-  deleteModerator: (id) => {
-    set((state) => ({
-      moderators: state.moderators.filter((m) => m.id !== id),
-    }));
-    const db = getDb();
-    if (db) db.from('moderators').delete().eq('id', id).then(({error}) => error && console.warn(error));
-  },
+        const newModerator: Moderator = {
+          ...moderator,
+          password: hashedPassword,
+          id,
+          createdAt: Date.now(),
+        };
 
-  getModeratorByEmail: (email) => {
-    return get().moderators.find(
-      (m) => m.email.toLowerCase() === email.toLowerCase()
-    );
-  },
-}));
+        set((state) => ({ moderators: [newModerator, ...state.moderators] }));
+
+        // Sync with backend API
+        try {
+          await fetch('/api/admin/moderators', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(newModerator)
+          });
+        } catch {}
+
+        return newModerator;
+      },
+
+      updateModerator: async (id, updatedModerator) => {
+        const payload = { ...updatedModerator };
+        if (payload.password) {
+          payload.password = isBcryptHash(payload.password)
+            ? payload.password
+            : hashPassword(payload.password);
+        }
+
+        set((state) => ({
+          moderators: state.moderators.map((m) =>
+            m.id === id ? { ...m, ...payload } : m
+          ),
+        }));
+
+        // Sync with backend API
+        try {
+          await fetch(`/api/admin/moderators/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+        } catch {}
+      },
+
+      deleteModerator: async (id) => {
+        set((state) => ({
+          moderators: state.moderators.filter((m) => m.id !== id),
+        }));
+
+        // Sync with backend API
+        try {
+          await fetch(`/api/admin/moderators/${id}`, {
+            method: 'DELETE'
+          });
+        } catch {}
+      },
+
+      getModeratorByEmail: (email) => {
+        if (!email) return undefined;
+        return get().moderators.find(
+          (m) => m.email.toLowerCase() === email.trim().toLowerCase()
+        );
+      },
+    }),
+    {
+      name: 'tazu_mart_moderators_store_v2',
+      partialize: (state) => ({
+        moderators: state.moderators,
+        sectionPassword: state.sectionPassword,
+      }),
+    }
+  )
+);

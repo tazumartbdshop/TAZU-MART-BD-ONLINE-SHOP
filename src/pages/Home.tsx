@@ -5,7 +5,7 @@ import {
   Sparkles, ChevronLeft, ChevronRight, Zap
 } from 'lucide-react';
 import { useCartStore } from '../store/useCartStore';
-import { useCategoryStore, resolveCategoryThumbnail, ensureAbsoluteUrl } from '../store/useCategoryStore';
+import { useCategoryStore, resolveCategoryThumbnail, resolveCategoryBanner, ensureAbsoluteUrl } from '../store/useCategoryStore';
 import { useProductStore } from '../store/useProductStore';
 import { useBannerStore } from '../store/useBannerStore';
 import { useSettingsStore } from '../store/useSettingsStore';
@@ -16,7 +16,7 @@ import FlashSaleTimer from '../components/home/FlashSaleTimer';
 import { CategorySection } from '../components/home/CategorySection';
 import { motion, AnimatePresence } from 'motion/react';
 import { preloadHomepageDataAndAssets } from '../utils/preloadHelper';
-import { INITIAL_SUPABASE_BANNERS } from '../data/initialSupabaseData';
+import { INITIAL_SUPABASE_BANNERS, INITIAL_SUPABASE_CATEGORIES } from '../data/initialSupabaseData';
 
 // Helper to optimize banner image URLs to WebP with responsive fit and width
 function getOptimizedImageUrl(url: string, width = 1200): string {
@@ -84,10 +84,15 @@ export default function Home() {
       return orderA - orderB;
     });
 
-  const categoriesToUse = activeDbCategories.length > 0 ? activeDbCategories : (categories || []).filter(c => c && c.status !== 'Inactive');
+  const categoriesToUse = activeDbCategories.length > 0 
+    ? activeDbCategories 
+    : (categories && categories.length > 0 
+        ? categories.filter(c => c && c.status !== 'Inactive') 
+        : (INITIAL_SUPABASE_CATEGORIES as any[]));
 
-  // Load dynamic categories completely from the database
+  // Load dynamic categories completely from the database with strict 1:1 square thumbnails
   const homeCategories = categoriesToUse.map(cat => ({
+    id: cat.id,
     name: cat.name,
     image: resolveCategoryThumbnail(cat),
     link: `/category/${cat.id || cat.slug || 'all'}`
@@ -371,10 +376,13 @@ export default function Home() {
 
           const displayCategoryProducts = categoryProducts.slice(0, 4);
 
+          // Check if category has a valid wide banner
+          const categoryBannerSrc = resolveCategoryBanner(cat);
+
           return (
             <section key={cat.id} className="py-4 md:py-6 border-b border-neutral-100 last:border-b-0">
-              {/* Category Banner (Full-Width Edge-to-Edge 1920:650) */}
-              {cat.bannerImage && (
+              {/* Category Banner (Full-Width Edge-to-Edge 1920:650) - Only shown here if configured, never before thumbnails */}
+              {categoryBannerSrc && (
                 <div className="mb-4 w-full p-0 overflow-hidden">
                   <CategoryBannerCarousel category={cat} />
                 </div>

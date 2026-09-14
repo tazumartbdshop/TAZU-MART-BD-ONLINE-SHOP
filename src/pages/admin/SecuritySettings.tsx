@@ -3,23 +3,13 @@ import { Shield, Lock, Eye, EyeOff, Save, CheckCircle, AlertCircle } from 'lucid
 import { useModeratorStore } from '../../store/useModeratorStore';
 import { motion } from 'framer-motion';
 
-import SecureLockScreen from '../../components/admin/SecureLockScreen';
-
 export default function SecuritySettings() {
-  const { sectionPassword, setSectionPassword, isUnlocked, setUnlocked } = useModeratorStore();
+  const { sectionPassword, setSectionPassword } = useModeratorStore();
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
-
-  const handleUnlock = (pwd: string) => {
-    if (pwd === sectionPassword) {
-      setUnlocked(true);
-      return true;
-    }
-    return false;
-  };
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,15 +33,6 @@ export default function SecuritySettings() {
     
     setTimeout(() => setSuccess(false), 3000);
   };
-
-  if (!isUnlocked) {
-    return (
-      <SecureLockScreen 
-        title="SECURE SETTINGS ACCESS"
-        onUnlock={handleUnlock}
-      />
-    );
-  }
 
   return (
     <div className="max-w-2xl mx-auto space-y-6 font-sans">

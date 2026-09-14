@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Search, Edit, Trash2, Image as ImageIcon, ChevronLeft, MoreVertical, Check, ExternalLink, Database } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useCategoryStore, Category } from '../../store/useCategoryStore';
+import { useCategoryStore, Category, resolveCategoryThumbnail, resolveCategoryBanner } from '../../store/useCategoryStore';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function CategoryList() {
@@ -138,7 +138,8 @@ export default function CategoryList() {
       {/* Categories Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-12">
         {filteredCategories.map((category) => {
-          const categoryImage = category.iconImage || category.bannerImage;
+          const categoryThumbnail = resolveCategoryThumbnail(category);
+          const categoryBanner = resolveCategoryBanner(category);
 
           return (
             <motion.div 
@@ -149,17 +150,22 @@ export default function CategoryList() {
             >
               <div>
                 <div className="flex gap-4">
-                  {/* Square Category Image */}
+                  {/* Square 1:1 Category Thumbnail */}
                   <div className="w-20 h-20 rounded-none bg-zinc-50 shrink-0 overflow-hidden relative border border-zinc-200 flex items-center justify-center">
-                    {categoryImage ? (
+                    {categoryThumbnail ? (
                       <img 
-                        src={categoryImage} 
+                        src={categoryThumbnail} 
                         alt={category.name} 
                         className="w-full h-full object-cover" 
                         referrerPolicy="no-referrer"
                       />
                     ) : (
                       <ImageIcon className="w-6 h-6 text-zinc-300" />
+                    )}
+                    {categoryBanner && (
+                      <span className="absolute bottom-0 right-0 bg-black text-white text-[7px] font-black uppercase px-1 py-0.5 tracking-tighter">
+                        BANNER
+                      </span>
                     )}
                   </div>
 

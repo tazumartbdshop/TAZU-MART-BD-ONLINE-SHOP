@@ -253,7 +253,7 @@ export default function Product() {
   const { products, fetchProductDetail } = useProductStore();
   const { offers } = useOfferStore();
   const { addViewedProduct } = useRecentlyViewedStore();
-  const { reviews } = useReviewStore();
+  const { reviews, fetchReviewsForProduct } = useReviewStore();
 
   const product = useMemo(() => {
     if (!urlParam) return null;
@@ -267,18 +267,34 @@ export default function Product() {
     }
   }, [urlParam, product?.description, fetchProductDetail]);
 
+  useEffect(() => {
+    if (product?.id) {
+      fetchReviewsForProduct(product.id);
+    }
+  }, [product?.id, fetchReviewsForProduct]);
+
+  const [reviewSummary, setReviewSummary] = useState<{
+    product_id: string;
+    average_rating: number;
+    total_reviews: number;
+    total_verified_reviews: number;
+    rating_breakdown: Record<string, number>;
+  } | null>(null);
+
   const approvedReviewsForProduct = useMemo(() => {
     if (!product) return [];
-    return reviews.filter(r => String(r.productId) === String(product.id) && r.status === 'approved');
+    return reviews.filter(r => String(r.productId) === String(product.id) && (r.status === 'approved' || !r.status));
   }, [reviews, product]);
 
   const liveReviewsCount = approvedReviewsForProduct.length;
   const liveAverageRating = useMemo(() => {
     if (liveReviewsCount === 0) return 0;
-    return Number((approvedReviewsForProduct.reduce((sum, r) => sum + r.rating, 0) / liveReviewsCount).toFixed(1));
+    return Number((approvedReviewsForProduct.reduce((sum, r) => sum + (Number(r.rating) || 5), 0) / liveReviewsCount).toFixed(1));
   }, [approvedReviewsForProduct, liveReviewsCount]);
 
-  const showRating = liveReviewsCount > 0;
+  const displayTotalReviews = reviewSummary !== null ? reviewSummary.total_reviews : liveReviewsCount;
+  const displayAvgRating = reviewSummary !== null ? reviewSummary.average_rating : liveAverageRating;
+  const showRating = displayTotalReviews > 0;
 
   // Dynamic Product JSON-LD Structured Data
   const jsonLd = useMemo(() => {
@@ -342,13 +358,6 @@ export default function Product() {
   
   const [activeImage, setActiveImage] = useState(0);
   const [isQnaOpen, setIsQnaOpen] = useState(false);
-  const [reviewSummary, setReviewSummary] = useState<{
-    product_id: string;
-    average_rating: number;
-    total_reviews: number;
-    total_verified_reviews: number;
-    rating_breakdown: Record<string, number>;
-  } | null>(null);
 
   useEffect(() => {
     if (!product?.id) return;
@@ -1299,11 +1308,29 @@ export default function Product() {
               )}
 
               {/* Dynamic Star Rating Block */}
-              {showRating && (
-                <div className="flex items-center gap-1.5 mt-2 select-none text-black font-[700] text-sm">
-                  <span>⭐</span>
-                  <span>{liveAverageRating.toFixed(1)}</span>
-                  <span className="text-zinc-500 font-semibold text-xs">({liveReviewsCount})</span>
+              {showRating ? (
+                <div 
+                  onClick={() => {
+                    const el = document.getElementById('reviews-section');
+                    if (el) el.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                  className="flex items-center gap-1.5 mt-2 select-none text-black font-[700] text-sm cursor-pointer hover:opacity-80 transition-opacity"
+                >
+                  <span className="text-amber-500">★</span>
+                  <span>{displayAvgRating > 0 ? displayAvgRating.toFixed(1) : '5.0'}</span>
+                  <span className="text-zinc-500 font-semibold text-xs">({displayTotalReviews} {displayTotalReviews === 1 ? 'review' : 'reviews'})</span>
+                </div>
+              ) : (
+                <div 
+                  onClick={() => {
+                    const el = document.getElementById('reviews-section');
+                    if (el) el.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                  className="flex items-center gap-1.5 mt-2 select-none text-zinc-400 text-xs font-semibold cursor-pointer hover:text-zinc-700 transition-colors"
+                >
+                  <span className="text-zinc-300">☆☆☆☆☆</span>
+                  <span>0 Reviews</span>
+                  <span className="text-[10px] text-zinc-400 font-normal">· Be the first to review</span>
                 </div>
               )}
             </div>
@@ -1577,7 +1604,14 @@ export default function Product() {
                     return (
                        <button
                           type="button"
-                          onClick={() => navigate(`/product/${product.slug}/reviews`)}
+                          onClick={() => {
+                             const el = document.getElementById('reviews-section');
+                             if (el) {
+                                el.scrollIntoView({ behavior: 'smooth' });
+                             } else {
+                                navigate(`/product/${product.slug || product.id}/reviews`);
+                             }
+                          }}
                           className="w-full h-[66px] px-4 border border-zinc-200 bg-white hover:bg-zinc-50 transition-colors flex items-center justify-between rounded-none text-left select-none"
                        >
                           <div className="flex flex-col justify-center">
@@ -1708,6 +1742,11 @@ export default function Product() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Customer Product Reviews & Ratings (Facebook-Style Social Reviews) */}
+      {product && (
+        <ProductReviews productId={product.id} productSlug={product.slug || undefined} />
+      )}
 
       {/* Related Products - "You May Also Like" */}
       {relatedProducts.length > 0 && (

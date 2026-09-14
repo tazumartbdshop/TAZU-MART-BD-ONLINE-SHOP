@@ -1,5 +1,66 @@
 {
-  "updatedAt": "2026-09-08T13:18:01.092Z",
-  "dailySummaries": {},
-  "recentEvents": []
+  "updatedAt": "2026-09-13T16:52:42.033Z",
+  "dailySummaries": {
+    "2026-09-13": {
+      "date": "2026-09-13",
+      "visits": 0,
+      "uniqueVisitors": 1,
+      "visitorIds": [
+        "v_fz43zdy4v_mtzxm70j"
+      ],
+      "newAccounts": 0,
+      "uniqueLoginUsers": 0,
+      "loginUserIds": [],
+      "loginEvents": 0,
+      "productViews": 0,
+      "productViewCounts": {},
+      "addToCartCount": 0,
+      "checkoutCount": 0,
+      "ordersCount": 0,
+      "completedOrdersCount": 0,
+      "revenue": 0
+    }
+  },
+  "recentEvents": [
+    {
+      "eventId": "page_view_fn5vuv_1789314315995",
+      "sessionId": "s_2dcmceeub_mtzxm70j",
+      "visitorId": "v_fz43zdy4v_mtzxm70j",
+      "userId": null,
+      "userName": null,
+      "eventType": "page_view",
+      "path": "/",
+      "title": "IYABD - Premium Fashion & Lifestyle",
+      "referrer": "https://aistudio.google.com/",
+      "timestamp": "2026-09-13T15:45:15.995Z",
+      "dateString": "2026-09-13",
+      "device": {
+        "isMobile": true,
+        "screen": "0x0",
+        "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36"
+      },
+      "metadata": {},
+      "ip": "103.16.250.2"
+    },
+    {
+      "eventId": "page_view_ybqail_1789317253341",
+      "sessionId": "s_2dcmceeub_mtzxm70j",
+      "visitorId": "v_fz43zdy4v_mtzxm70j",
+      "userId": null,
+      "userName": null,
+      "eventType": "page_view",
+      "path": "/",
+      "title": "IYABD - Premium Fashion & Lifestyle",
+      "referrer": "https://aistudio.google.com/",
+      "timestamp": "2026-09-13T16:34:13.341Z",
+      "dateString": "2026-09-13",
+      "device": {
+        "isMobile": true,
+        "screen": "552x1733",
+        "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36"
+      },
+      "metadata": {},
+      "ip": "103.16.250.17"
+    }
+  ]
 }

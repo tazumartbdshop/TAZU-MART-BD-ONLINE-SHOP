@@ -115,7 +115,7 @@ export const defaultNavItems: NavItem[] = [
     name: 'Footer',
     path: '/admin/management/footer',
     icon: SlidersHorizontal,
-    moduleId: 'dashboard'
+    moduleId: 'settings'
   },
   {
     name: 'Offers',
@@ -145,7 +145,7 @@ export const defaultNavItems: NavItem[] = [
   { 
     name: 'Reviews', 
     icon: Star,
-    moduleId: 'dashboard',
+    moduleId: 'reviews',
     subItems: [
       { name: 'Add Review', path: '/admin/reviews/add', icon: PlusCircle },
       { name: 'Review Listing', path: '/admin/reviews/list', icon: Star }
@@ -177,7 +177,7 @@ export const defaultNavItems: NavItem[] = [
   { 
     name: 'Campaigns',
     icon: Megaphone,
-    moduleId: 'dashboard',
+    moduleId: 'campaigns',
     subItems: [
       { name: 'Create Campaign', path: '/admin/campaigns/create', icon: PlusCircle },
       { name: 'Campaign History', path: '/admin/campaigns/history', icon: History }
@@ -192,7 +192,7 @@ export const defaultNavItems: NavItem[] = [
   { 
     name: 'Marketing & Tracking',
     icon: Megaphone,
-    moduleId: 'dashboard',
+    moduleId: 'marketing',
     subItems: [
       { name: 'Facebook', path: '/admin/marketing/facebook', icon: Fingerprint },
       { name: 'TikTok', path: '/admin/marketing/tiktok', icon: Video },
@@ -223,7 +223,7 @@ export const defaultNavItems: NavItem[] = [
   { 
     name: 'Control',
     icon: Sliders,
-    moduleId: 'dashboard',
+    moduleId: 'settings',
     subItems: [
       { name: 'Game Control', path: '/admin/game-control', icon: Gamepad },
       { name: 'Coin Control', path: '/admin/coin-control', icon: Coins },
@@ -242,7 +242,7 @@ export const defaultNavItems: NavItem[] = [
   { 
     name: 'Delivery Methods',
     icon: Truck,
-    moduleId: 'orders',
+    moduleId: 'delivery',
     subItems: [
       { name: 'Delivery API', path: '/admin/delivery/courier-api', icon: Radio }
     ]
@@ -250,7 +250,7 @@ export const defaultNavItems: NavItem[] = [
   { 
     name: 'Website Management',
     icon: Globe,
-    moduleId: 'dashboard',
+    moduleId: 'settings',
     subItems: [
       { name: 'Store Identity', path: '/admin/management/store-identity', icon: Store },
       { name: 'Account & Login Images', path: '/admin/management/auth-images', icon: UserCheck },

@@ -33,22 +33,44 @@ export interface Category {
 
 export const CATEGORY_FALLBACKS = [];
 
+/**
+ * Strict 1:1 Category Thumbnail resolution.
+ * NEVER falls back to wide bannerImage or bannerImages.
+ */
 export function resolveCategoryThumbnail(cat: Partial<Category> | null | undefined): string {
   if (!cat) return '';
+  if (cat.iconImage && cat.iconImage.trim() !== '') {
+    return ensureAbsoluteUrl(cat.iconImage);
+  }
   if (cat.imageUrl && cat.imageUrl.trim() !== '') {
     return ensureAbsoluteUrl(cat.imageUrl);
   }
   if (cat.image_url && cat.image_url.trim() !== '') {
     return ensureAbsoluteUrl(cat.image_url);
   }
-  if (cat.iconImage && cat.iconImage.trim() !== '') {
-    return ensureAbsoluteUrl(cat.iconImage);
+  if ((cat as any).thumbnail && typeof (cat as any).thumbnail === 'string' && (cat as any).thumbnail.trim() !== '') {
+    return ensureAbsoluteUrl((cat as any).thumbnail);
   }
+  if ((cat as any).image && typeof (cat as any).image === 'string' && (cat as any).image.trim() !== '') {
+    return ensureAbsoluteUrl((cat as any).image);
+  }
+  return '';
+}
+
+/**
+ * Strict wide Category Banner resolution.
+ * NEVER falls back to 1:1 square iconImage, imageUrl, or thumbnail.
+ */
+export function resolveCategoryBanner(cat: Partial<Category> | null | undefined): string {
+  if (!cat) return '';
   if (cat.bannerImage && cat.bannerImage.trim() !== '') {
     return ensureAbsoluteUrl(cat.bannerImage);
   }
-  if (cat.bannerImages && Array.isArray(cat.bannerImages) && cat.bannerImages.length > 0 && cat.bannerImages[0]) {
+  if (cat.bannerImages && Array.isArray(cat.bannerImages) && cat.bannerImages.length > 0 && cat.bannerImages[0] && cat.bannerImages[0].trim() !== '') {
     return ensureAbsoluteUrl(cat.bannerImages[0]);
+  }
+  if (cat.wideBannerImage && cat.wideBannerImage.trim() !== '') {
+    return ensureAbsoluteUrl(cat.wideBannerImage);
   }
   return '';
 }

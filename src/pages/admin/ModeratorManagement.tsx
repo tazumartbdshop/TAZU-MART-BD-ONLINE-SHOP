@@ -28,25 +28,24 @@ import { motion, AnimatePresence } from 'framer-motion';
 import SecureLockScreen from '../../components/admin/SecureLockScreen';
 
 const MODULES = [
-  { id: 'dashboard', name: 'Dashboard', path: '/admin' },
-  { id: 'orders', name: 'Order Management', path: '/admin/orders' },
-  { id: 'products', name: 'Product Management', path: '/admin/products' },
-  { id: 'users', name: 'User Management', path: '/admin/customers' },
-  { id: 'categories', name: 'Category Management', path: '/admin/categories' },
-  { id: 'coupons', name: 'Coupon Management', path: '/admin/coupons' },
-  { id: 'payments', name: 'Payment Management', path: '/admin/payments' },
-  { id: 'analytics', name: 'Report & Analytics', path: '/admin/analytics' },
-  { id: 'notifications', name: 'Notifications', path: '/admin/notifications' },
-  { id: 'logs', name: 'Activity Logs', path: '/admin/activity-logs' },
-  { id: 'settings', name: 'Website Settings', path: '/admin/settings' },
-  { id: 'banners', name: 'Banner Management', path: '/admin/banners' },
-  { id: 'support', name: 'Support System', path: '/admin/support' },
-  { id: 'roles', name: 'Role Management', path: '/admin/management/moderators' },
-  { id: 'permissions', name: 'Permission Management', path: '/admin/management/moderators' },
+  { id: 'dashboard', name: 'Dashboard' },
+  { id: 'orders', name: 'Orders' },
+  { id: 'products', name: 'Products & Upload' },
+  { id: 'users', name: 'Customers' },
+  { id: 'categories', name: 'Categories' },
+  { id: 'banners', name: 'Banner Control' },
+  { id: 'reviews', name: 'Reviews' },
+  { id: 'payments', name: 'Payment Management' },
+  { id: 'delivery', name: 'Delivery Management' },
+  { id: 'settings', name: 'Settings' },
+  { id: 'roles', name: 'Admin Management' },
+  { id: 'support', name: 'Messages / Support' },
+  { id: 'campaigns', name: 'Campaigns & Promos' },
+  { id: 'analytics', name: 'Analytics & SEO' }
 ];
 
 export default function ModeratorManagement() {
-  const { moderators, addModerator, updateModerator, deleteModerator, isUnlocked, setUnlocked, sectionPassword } = useModeratorStore();
+  const { moderators, addModerator, updateModerator, deleteModerator } = useModeratorStore();
   const [isAdding, setIsAdding] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [editingMod, setEditingMod] = useState<Moderator | null>(null);
@@ -138,14 +137,6 @@ export default function ModeratorManagement() {
     setIsAdding(true);
   };
 
-  const handleUnlock = (password: string) => {
-    if (password === sectionPassword) {
-      setUnlocked(true);
-      return true;
-    }
-    return false;
-  };
-
   const { memberOrder } = useMenuSortStore();
 
   const getSortedMods = () => {
@@ -172,15 +163,6 @@ export default function ModeratorManagement() {
   const allPermissions = moderators.reduce((acc: string[], m) => [...acc, ...m.permissions], []);
   const uniquePermissions = allPermissions.filter((p, i) => allPermissions.indexOf(p) === i);
   const totalPermissionsCount = uniquePermissions.length;
-
-  if (!isUnlocked) {
-    return (
-      <SecureLockScreen 
-        title="SECURE MODERATOR ACCESS"
-        onUnlock={handleUnlock}
-      />
-    );
-  }
 
   if (isAdding) {
     return (

@@ -389,28 +389,15 @@ export default function AdminDashboard() {
   const hasPermission = (item: any) => {
     if (user?.role === 'admin') return true;
     if (!user?.permissions) return false;
+    if (user.permissions.includes('all')) return true;
     
     // Check if the item's moduleId is in user's permissions
     if (item.moduleId && user.permissions.includes(item.moduleId)) return true;
     
-    // If it's a subitem, check its parent or if it has its own moduleId
     return false;
   };
 
-  const filteredNavItems = navItems.filter(item => {
-    // Basic menu item filtering
-    const permitted = hasPermission(item);
-    
-    // Special handling for sub-items filtering if needed
-    if (permitted && item.subItems) {
-      item.subItems = item.subItems.filter(sub => {
-        if (sub.superAdminOnly && user?.role !== 'admin') return false;
-        return true;
-      });
-    }
-    
-    return permitted;
-  });
+  const filteredNavItems = navItems;
 
   useEffect(() => {
     if (sidebarOpen) {
@@ -476,6 +463,9 @@ export default function AdminDashboard() {
                   lastCategory = category;
                 }
 
+                const permitted = hasPermission(item);
+                const isLocked = !permitted;
+
                 return (
                   <React.Fragment key={item.name}>
                     {renderCategoryHeader && (
@@ -487,7 +477,29 @@ export default function AdminDashboard() {
                     )}
 
                     <div className="flex flex-col gap-0.5">
-                      {hasSubmenu ? (
+                      {isLocked ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            toast.error(`🔒 Access Locked: Your account does not have permission for "${item.name}". Please contact Administrator to request access.`, { id: `locked-${item.name}` });
+                          }}
+                          className={`flex items-center group px-3.5 py-2.5 rounded-[10px] transition-all duration-150 w-full relative opacity-60 hover:opacity-90 hover:bg-amber-50/70 text-[#666666] cursor-not-allowed ${!showLabels ? 'justify-center px-0' : 'justify-between'}`}
+                          title={`Locked: Permission required for ${item.name}`}
+                        >
+                          <div className={`flex items-center ${!showLabels ? 'justify-center' : 'gap-3'}`}>
+                            <item.icon className="w-[20px] h-[20px] shrink-0 text-[#8A8F98]" />
+                            {showLabels && (
+                              <span className="text-[14px] tracking-tight font-medium text-[#777777]">{item.name}</span>
+                            )}
+                          </div>
+                          {showLabels && (
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[9px] font-bold uppercase tracking-wider text-amber-700 bg-amber-100/90 px-1.5 py-0.5 rounded">Locked</span>
+                              <Lock className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                            </div>
+                          )}
+                        </button>
+                      ) : hasSubmenu ? (
                         <button
                           onClick={() => {
                             if (!showLabels) {
@@ -562,6 +574,23 @@ export default function AdminDashboard() {
                         >
                           <div className="ml-6 pl-3 py-1 flex flex-col gap-1 my-1 border-l border-[#EAECEF]">
                             {item.subItems!.map(subItem => {
+                              const isSubLocked = (subItem.superAdminOnly && user?.role !== 'admin');
+                              if (isSubLocked) {
+                                return (
+                                  <button
+                                    key={subItem.name}
+                                    type="button"
+                                    onClick={() => {
+                                      toast.error(`🔒 Access Locked: "${subItem.name}" is restricted to Super Admin.`, { id: `locked-sub-${subItem.name}` });
+                                    }}
+                                    className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-[13px] opacity-60 hover:opacity-85 text-[#777777] hover:bg-amber-50/50 w-full text-left cursor-not-allowed"
+                                  >
+                                    <span className="truncate">{subItem.name}</span>
+                                    <Lock className="w-3 h-3 text-amber-500 shrink-0" />
+                                  </button>
+                                );
+                              }
+
                               const subActive = location.pathname === subItem.path;
                               return (
                                 <Link
@@ -638,7 +667,12 @@ export default function AdminDashboard() {
             </button>
             <div className="text-right hidden sm:block">
                <p className="text-sm font-bold text-[#000000]">{user?.name || 'Admin User'}</p>
-               <p className="text-xs text-[#666666]">Main Administrator</p>
+               <div className="flex items-center justify-end gap-1.5 mt-0.5">
+                 <span className={`inline-block w-2 h-2 rounded-full ${user?.role === 'admin' ? 'bg-emerald-500' : 'bg-indigo-500'}`} />
+                 <p className="text-[11px] font-semibold text-[#666666]">
+                   {user?.role === 'admin' ? 'Super Administrator' : (user?.role === 'moderator' ? 'Staff / Moderator' : 'Team Member')}
+                 </p>
+               </div>
             </div>
             <div className="w-10 h-10 rounded-none bg-[#000000] border-2 border-white shadow-md flex items-center justify-center text-white font-bold overflow-hidden">
                {settings.storeLogo && !logoError ? (
@@ -694,34 +728,34 @@ export default function AdminDashboard() {
               <Route path="/settings" element={<PermissionGate moduleId="settings"><AdminSettings /></PermissionGate>} />
               <Route path="/theme-settings" element={<PermissionGate moduleId="settings"><AdminThemeSettings /></PermissionGate>} />
               <Route path="/activity-logs" element={<PermissionGate moduleId="logs"><ComingSoon title="Activity Logs" /></PermissionGate>} />
-              <Route path="/marketing/facebook" element={<PermissionGate moduleId="dashboard"><AdminMarketingFacebook /></PermissionGate>} />
-              <Route path="/marketing/tiktok" element={<PermissionGate moduleId="dashboard"><AdminMarketingTikTok /></PermissionGate>} />
-              <Route path="/marketing/google" element={<PermissionGate moduleId="dashboard"><AdminMarketingGoogle /></PermissionGate>} />
-              <Route path="/marketing/server-side" element={<PermissionGate moduleId="dashboard"><AdminMarketingServerSide /></PermissionGate>} />
-              <Route path="/server-side-tracking" element={<PermissionGate moduleId="dashboard"><AdminMarketingServerSide /></PermissionGate>} />
-              <Route path="/gtm-server-tracking" element={<PermissionGate moduleId="dashboard"><AdminMarketingServerSide /></PermissionGate>} />
-              <Route path="/marketing/uptime-monitoring" element={<PermissionGate moduleId="dashboard"><AdminUptimeMonitoring /></PermissionGate>} />
-              <Route path="/marketing/search-console-seo" element={<PermissionGate moduleId="dashboard"><AdminSearchConsoleSEO /></PermissionGate>} />
-              <Route path="/marketing/tracking-overview" element={<PermissionGate moduleId="dashboard"><AdminMarketingTrackingOverview /></PermissionGate>} />
+              <Route path="/marketing/facebook" element={<PermissionGate moduleId="marketing"><AdminMarketingFacebook /></PermissionGate>} />
+              <Route path="/marketing/tiktok" element={<PermissionGate moduleId="marketing"><AdminMarketingTikTok /></PermissionGate>} />
+              <Route path="/marketing/google" element={<PermissionGate moduleId="marketing"><AdminMarketingGoogle /></PermissionGate>} />
+              <Route path="/marketing/server-side" element={<PermissionGate moduleId="marketing"><AdminMarketingServerSide /></PermissionGate>} />
+              <Route path="/server-side-tracking" element={<PermissionGate moduleId="marketing"><AdminMarketingServerSide /></PermissionGate>} />
+              <Route path="/gtm-server-tracking" element={<PermissionGate moduleId="marketing"><AdminMarketingServerSide /></PermissionGate>} />
+              <Route path="/marketing/uptime-monitoring" element={<PermissionGate moduleId="marketing"><AdminUptimeMonitoring /></PermissionGate>} />
+              <Route path="/marketing/search-console-seo" element={<PermissionGate moduleId="marketing"><AdminSearchConsoleSEO /></PermissionGate>} />
+              <Route path="/marketing/tracking-overview" element={<PermissionGate moduleId="marketing"><AdminMarketingTrackingOverview /></PermissionGate>} />
               <Route path="/banner/create" element={<PermissionGate moduleId="banners"><AdminBanners /></PermissionGate>} />
               <Route path="/banner/list" element={<PermissionGate moduleId="banners"><BannerListing /></PermissionGate>} />
               <Route path="/flutter-banner" element={<PermissionGate moduleId="banners"><AdminFlutterBanner /></PermissionGate>} />
               <Route path="/brand-showcase" element={<PermissionGate moduleId="banners"><AdminBrandShowcase /></PermissionGate>} />
-              <Route path="/management/site-management" element={<PermissionGate moduleId="dashboard"><AdminSiteManagement /></PermissionGate>} />
-              <Route path="/management/store-identity" element={<PermissionGate moduleId="dashboard"><AdminStoreIdentity /></PermissionGate>} />
-              <Route path="/management/auth-images" element={<PermissionGate moduleId="dashboard"><AdminAuthImages /></PermissionGate>} />
-              <Route path="/management/business-address" element={<PermissionGate moduleId="dashboard"><AdminBusinessAddress /></PermissionGate>} />
-              <Route path="/management/social-links" element={<PermissionGate moduleId="dashboard"><AdminSocialLinks /></PermissionGate>} />
-              <Route path="/management/footer" element={<PermissionGate moduleId="dashboard"><AdminFooterSettings /></PermissionGate>} />
-              <Route path="/management/support-banner" element={<PermissionGate moduleId="dashboard"><AdminSupportBanner /></PermissionGate>} />
+              <Route path="/management/site-management" element={<PermissionGate moduleId="settings"><AdminSiteManagement /></PermissionGate>} />
+              <Route path="/management/store-identity" element={<PermissionGate moduleId="settings"><AdminStoreIdentity /></PermissionGate>} />
+              <Route path="/management/auth-images" element={<PermissionGate moduleId="settings"><AdminAuthImages /></PermissionGate>} />
+              <Route path="/management/business-address" element={<PermissionGate moduleId="settings"><AdminBusinessAddress /></PermissionGate>} />
+              <Route path="/management/social-links" element={<PermissionGate moduleId="settings"><AdminSocialLinks /></PermissionGate>} />
+              <Route path="/management/footer" element={<PermissionGate moduleId="settings"><AdminFooterSettings /></PermissionGate>} />
+              <Route path="/management/support-banner" element={<PermissionGate moduleId="settings"><AdminSupportBanner /></PermissionGate>} />
               <Route path="/support" element={<PermissionGate moduleId="support"><AdminSupport /></PermissionGate>} />
               <Route path="/support/ai" element={<PermissionGate moduleId="support"><AdminAIControlCenter /></PermissionGate>} />
               <Route path="/notifications" element={<PermissionGate moduleId="support"><AdminNotificationsPage /></PermissionGate>} />
               <Route path="/ai-control-center" element={<PermissionGate moduleId="settings"><AdminAIControlCenter /></PermissionGate>} />
-              <Route path="/reviews" element={<PermissionGate moduleId="dashboard"><AdminReviewList /></PermissionGate>} />
-              <Route path="/reviews/add" element={<PermissionGate moduleId="dashboard"><AdminReviewAdd /></PermissionGate>} />
-              <Route path="/reviews/list" element={<PermissionGate moduleId="dashboard"><AdminReviewList /></PermissionGate>} />
-              <Route path="/reviews/detail/:id" element={<PermissionGate moduleId="dashboard"><AdminReviewDetail /></PermissionGate>} />
+              <Route path="/reviews" element={<PermissionGate moduleId="reviews"><AdminReviewList /></PermissionGate>} />
+              <Route path="/reviews/add" element={<PermissionGate moduleId="reviews"><AdminReviewAdd /></PermissionGate>} />
+              <Route path="/reviews/list" element={<PermissionGate moduleId="reviews"><AdminReviewList /></PermissionGate>} />
+              <Route path="/reviews/detail/:id" element={<PermissionGate moduleId="reviews"><AdminReviewDetail /></PermissionGate>} />
               <Route path="/search-listing" element={<PermissionGate moduleId="products"><AdminSearchListing /></PermissionGate>} />
               <Route path="/search-analytics" element={<PermissionGate moduleId="analytics"><AdminSearchListing /></PermissionGate>} />
               <Route path="/analytics" element={<PermissionGate moduleId="analytics"><AdminWebsiteAnalytics /></PermissionGate>} />
@@ -729,20 +763,20 @@ export default function AdminDashboard() {
               <Route path="/server-monitoring" element={<PermissionGate moduleId="analytics"><AdminServerMonitoring /></PermissionGate>} />
               <Route path="/marketing/server-monitoring" element={<PermissionGate moduleId="analytics"><AdminServerMonitoring /></PermissionGate>} />
               <Route path="/menu-management" element={<PermissionGate moduleId="settings"><AdminMenuManagement /></PermissionGate>} />
-              <Route path="/system-management" element={<PermissionGate moduleId="dashboard"><AdminManagementModule /></PermissionGate>} />
+              <Route path="/system-management" element={<PermissionGate moduleId="settings"><AdminManagementModule /></PermissionGate>} />
               <Route path="/management/bar-management" element={<PermissionGate moduleId="settings"><AdminMenuManagement /></PermissionGate>} />
-              <Route path="/management/review-monitoring" element={<PermissionGate moduleId="dashboard"><AdminReviews /></PermissionGate>} />
-              <Route path="/management/promo-codes" element={<PermissionGate moduleId="dashboard"><AdminPromoCodes /></PermissionGate>} />
-              <Route path="/management/push-notifications" element={<PermissionGate moduleId="dashboard"><AdminPushNotifications activeTab="create" /></PermissionGate>} />
-              <Route path="/campaigns/create" element={<PermissionGate moduleId="dashboard"><AdminPushNotifications activeTab="create" /></PermissionGate>} />
-              <Route path="/campaigns/history" element={<PermissionGate moduleId="dashboard"><AdminPushNotifications activeTab="history" /></PermissionGate>} />
+              <Route path="/management/review-monitoring" element={<PermissionGate moduleId="reviews"><AdminReviews /></PermissionGate>} />
+              <Route path="/management/promo-codes" element={<PermissionGate moduleId="campaigns"><AdminPromoCodes /></PermissionGate>} />
+              <Route path="/management/push-notifications" element={<PermissionGate moduleId="campaigns"><AdminPushNotifications activeTab="create" /></PermissionGate>} />
+              <Route path="/campaigns/create" element={<PermissionGate moduleId="campaigns"><AdminPushNotifications activeTab="create" /></PermissionGate>} />
+              <Route path="/campaigns/history" element={<PermissionGate moduleId="campaigns"><AdminPushNotifications activeTab="history" /></PermissionGate>} />
               <Route path="/management/banner-management" element={<PermissionGate moduleId="banners"><AdminBanners /></PermissionGate>} />
-              <Route path="/management/popup-management" element={<PermissionGate moduleId="dashboard"><AdminPopupManagement /></PermissionGate>} />
-              <Route path="/delivery/courier-api" element={<PermissionGate moduleId="orders"><AdminCourierAPI /></PermissionGate>} />
-              <Route path="/delivery/courier-charge" element={<PermissionGate moduleId="orders"><AdminCourierCharges /></PermissionGate>} />
-              <Route path="/game-control" element={<PermissionGate moduleId="dashboard"><AdminBarControl /></PermissionGate>} />
-              <Route path="/coin-control" element={<PermissionGate moduleId="dashboard"><AdminBarControl /></PermissionGate>} />
-              <Route path="/bar-control" element={<PermissionGate moduleId="dashboard"><AdminBarControl /></PermissionGate>} />
+              <Route path="/management/popup-management" element={<PermissionGate moduleId="campaigns"><AdminPopupManagement /></PermissionGate>} />
+              <Route path="/delivery/courier-api" element={<PermissionGate moduleId="delivery"><AdminCourierAPI /></PermissionGate>} />
+              <Route path="/delivery/courier-charge" element={<PermissionGate moduleId="delivery"><AdminCourierCharges /></PermissionGate>} />
+              <Route path="/game-control" element={<PermissionGate moduleId="settings"><AdminBarControl /></PermissionGate>} />
+              <Route path="/coin-control" element={<PermissionGate moduleId="settings"><AdminBarControl /></PermissionGate>} />
+              <Route path="/bar-control" element={<PermissionGate moduleId="settings"><AdminBarControl /></PermissionGate>} />
              <Route path="*" element={
                 <div className="bg-white p-12 text-center border border-gray-100 min-h-[50vh] flex flex-col items-center justify-center">
                   <h2 className="text-2xl font-bold text-gray-800 mb-2">404 - Module Not Found</h2>
@@ -1531,32 +1565,73 @@ function PermissionGate({
 
   // If mod is trying to access super-admin only page
   if (superAdminOnly) {
-    return <AccessDenied reason="Super Admin Only" />;
+    return <AccessDenied reason="Super Admin Only" moduleId={moduleId} />;
   }
 
   // Check moderator permissions
-  if (user.role === 'moderator' && user.permissions?.includes(moduleId)) {
-    return <>{children}</>;
+  if (['moderator', 'staff', 'support'].includes(user.role)) {
+    if (user.permissions?.includes('all') || user.permissions?.includes(moduleId)) {
+      return <>{children}</>;
+    }
   }
 
-  return <AccessDenied reason="Permission Required" />;
+  return <AccessDenied reason="Module Locked" moduleId={moduleId} />;
 }
 
-function AccessDenied({ reason }: { reason: string }) {
+function AccessDenied({ reason, moduleId }: { reason: string; moduleId?: string }) {
+  const { user } = useAuthStore();
   return (
-    <div className="bg-white rounded-none border border-[#EEEEEE] shadow-[0_4px_20px_rgb(0,0,0,0.03)] p-12 text-center min-h-[60vh] flex flex-col items-center justify-center">
-       <div className="w-20 h-20 bg-red-50 rounded-none flex items-center justify-center mb-6">
-         <Shield className="w-10 h-10 text-red-500" />
+    <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-8 sm:p-12 text-center min-h-[60vh] flex flex-col items-center justify-center max-w-2xl mx-auto my-6">
+       <div className="relative mb-6">
+         <div className="w-20 h-20 bg-amber-50 rounded-2xl flex items-center justify-center border border-amber-200/80 shadow-inner">
+           <Lock className="w-10 h-10 text-amber-600" />
+         </div>
+         <span className="absolute -bottom-1 -right-1 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center text-white text-xs font-black shadow-sm">
+           ✕
+         </span>
        </div>
-       <h2 className="text-3xl font-serif font-bold text-[#000000] mb-4">Access Denied</h2>
-       <p className="text-[10px] font-black uppercase tracking-widest text-red-500 mb-4 bg-red-50 px-4 py-1 border border-red-100">{reason}</p>
-       <p className="text-[#666666] max-w-md mx-auto text-lg mb-8">
-         Your role does not have the necessary permissions to access this specific module. 
-         Please contact the primary administrator for authorization.
+       
+       <span className="text-[11px] font-bold uppercase tracking-widest text-amber-800 bg-amber-100/80 px-3.5 py-1 rounded-full border border-amber-200 mb-3">
+         {reason}
+       </span>
+
+       <h2 className="text-2xl sm:text-3xl font-bold text-neutral-900 mb-3 tracking-tight">
+         Access to This Module is Locked
+       </h2>
+
+       <p className="text-neutral-600 text-sm sm:text-base leading-relaxed max-w-md mx-auto mb-6">
+         {user?.role === 'moderator' 
+           ? `Your staff account (${user.email}) has not been granted permission to access the "${moduleId || 'requested'}" section.`
+           : 'Your current account does not have sufficient privileges to access this section.'
+         }
+         <br />
+         Please contact the Super Administrator to update your role permissions.
        </p>
-       <Link to="/admin" className="px-8 py-3 bg-[#000000] text-white font-bold uppercase tracking-widest text-xs hover:bg-black/90 transition-all">
-         Return to Dashboard
-       </Link>
+
+       {user?.permissions && user.permissions.length > 0 && (
+         <div className="mb-8 w-full bg-neutral-50 rounded-xl p-4 border border-neutral-200/80 text-left">
+           <p className="text-xs font-bold text-neutral-500 uppercase tracking-wider mb-2">
+             Your Permitted Modules:
+           </p>
+           <div className="flex flex-wrap gap-1.5">
+             {user.permissions.map((p) => (
+               <span key={p} className="text-xs font-semibold bg-white text-neutral-800 px-2.5 py-1 rounded-md border border-neutral-200 shadow-2xs">
+                 ✓ {p}
+               </span>
+             ))}
+           </div>
+         </div>
+       )}
+
+       <div className="flex flex-wrap items-center justify-center gap-3">
+         <Link 
+           to="/admin" 
+           className="px-6 py-2.5 bg-neutral-900 hover:bg-black text-white font-semibold text-sm rounded-xl transition-all shadow-sm flex items-center gap-2"
+         >
+           <LayoutDashboard className="w-4 h-4" />
+           Return to Permitted Dashboard
+         </Link>
+       </div>
     </div>
   );
 }

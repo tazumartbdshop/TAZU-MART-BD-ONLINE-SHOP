@@ -1024,5 +1024,20 @@
       "created_at": "2026-08-17T06:34:57.295374+00:00",
       "updated_at": "2026-08-17T06:34:57.295374+00:00"
     }
+  ],
+  "moderators": [
+    {
+      "id": "mod_1789317976738",
+      "name": "Test",
+      "email": "test@test.com",
+      "password": "$2b$10$6TOeyoRHgZj5KPmsSV8D4OtQ4cRkIG7pJdI890sExUw/ktIddI4bu",
+      "role": "Moderator",
+      "status": "Active",
+      "permissions": [],
+      "phone": "",
+      "dob": "",
+      "gender": "",
+      "createdAt": 1789317976738
+    }
   ]
 }

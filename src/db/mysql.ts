@@ -179,7 +179,7 @@ export const dbSelect = async (tableName: string, whereClause: string = '', para
   try {
     let { data, error } = await supabaseAdmin.from(targetTable).select('*');
     if (error) {
-      console.warn(`[Supabase Select] Error querying table ${targetTable}:`, error.message);
+      if (!error.message.includes('Could not find the table')) { console.warn(`[Supabase Select] Error querying table ${targetTable}:`, error.message); }
       // Fallback to local cache if Supabase table not found or transient network issue
       const local = await ensureFileDb();
       data = local[targetTable] || local[table] || [];

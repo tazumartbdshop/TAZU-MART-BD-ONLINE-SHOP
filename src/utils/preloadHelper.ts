@@ -1,4 +1,4 @@
-import { useCategoryStore, mapDbToCategory } from '../store/useCategoryStore';
+import { useCategoryStore, mapDbToCategory, resolveCategoryThumbnail } from '../store/useCategoryStore';
 import { useProductStore } from '../store/useProductStore';
 import { useBannerStore } from '../store/useBannerStore';
 import { useSettingsStore } from '../store/useSettingsStore';
@@ -325,9 +325,9 @@ export async function preloadHomepageDataAndAssets(): Promise<void> {
         imagesToPreload.push(firstBanner.imageUrl || firstBanner.image);
       }
 
-      // First 6 category thumbnail images
+      // First 6 category thumbnail images (Strict 1:1 thumbnails only)
       categories.slice(0, 6).forEach((cat: any) => {
-        const img = cat.iconImage || cat.bannerImage;
+        const img = resolveCategoryThumbnail(cat);
         if (img) imagesToPreload.push(img);
       });
 

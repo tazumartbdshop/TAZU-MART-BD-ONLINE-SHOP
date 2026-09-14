@@ -513,12 +513,12 @@ export default function AddCategory() {
                 <span className="h-px bg-zinc-100 block" />
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div className="space-y-4">
-                    <h5 className="text-[10px] font-black text-black uppercase tracking-widest">Category Cover Image</h5>
-                    <p className="text-[9px] text-gray-400 font-bold uppercase tracking-tight -mt-3">Tap to upload square thumbnail (displayed in search & browse)</p>
+                    <h5 className="text-[10px] font-black text-black uppercase tracking-widest">1:1 Category Thumbnail (Square Image)</h5>
+                    <p className="text-[9px] text-gray-500 font-bold uppercase tracking-tight -mt-3">Displayed on Homepage 1:1 Category Section, Search & Navigation</p>
                     
                     {formData.iconImage ? (
                       <div className="relative w-28 h-28 bg-zinc-50 border border-zinc-200 p-2 flex items-center justify-center">
-                        <img src={formData.iconImage} alt="Cover thumbnail" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                        <img src={formData.iconImage} alt="1:1 Category thumbnail" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                         <button
                           type="button"
                           onClick={removeThumbnailImage}
@@ -533,7 +533,7 @@ export default function AddCategory() {
                         className="w-28 h-28 border-2 border-dashed border-zinc-200 hover:border-black bg-zinc-50 hover:bg-zinc-100/50 cursor-pointer flex flex-col items-center justify-center gap-1.5 transition-all text-center"
                       >
                         <Camera className="w-5 h-5 text-gray-400" />
-                        <span className="text-[8px] text-gray-400 font-black uppercase tracking-widest">Upload Cover</span>
+                        <span className="text-[8px] text-gray-400 font-black uppercase tracking-widest">Upload 1:1 Thumbnail</span>
                       </div>
                     )}
                     
@@ -554,8 +554,8 @@ export default function AddCategory() {
                     <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-100 pb-3">
                       <div>
                         <h5 className="text-xs font-black text-black uppercase tracking-widest flex items-center gap-2">
-                          <span>Category Hero Banners</span>
-                          <span className="bg-zinc-800 text-white text-[9px] px-2 py-0.5 font-mono font-bold">ORIGINAL RESOLUTION</span>
+                          <span>Category Hero Banners (Wide Ratio)</span>
+                          <span className="bg-zinc-800 text-white text-[9px] px-2 py-0.5 font-mono font-bold">WIDE BANNER</span>
                         </h5>
                         <p className="text-[11px] text-gray-600 font-medium mt-1">
                           ইমেজটির Original Resolution এবং Original Aspect Ratio অপরিবর্তিত থাকবে। কোনো Forced Crop বা Stretch করা হবে না।

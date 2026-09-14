@@ -13,6 +13,7 @@ import { cn } from '../lib/utils';
 import { pixelService } from '../utils/pixelService';
 import { getProviderIcon } from '../components/ProviderIcon';
 import { useLoginBanner } from '../services/loginBannerService';
+import { verifyPassword } from '../lib/authCrypto';
 
 export default function Login() {
   const { settings } = useSettingsStore();
@@ -274,26 +275,57 @@ export default function Login() {
             return;
         }
 
-        // 3. Check Moderator
+
+        // 3. Check Moderator / Staff Account
+        try {
+          const res = await fetch('/api/admin/moderators/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: normalizedIdentifier, password })
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.token) {
+              localStorage.setItem('auth_token', data.token);
+              login(data.user);
+              navigate('/admin');
+              return;
+            }
+          }
+        } catch (e) {
+          console.warn("Backend login failed, falling back to local DB check", e);
+        }
+
+        // 3b. Fallback Local Check Moderator / Staff Account
         const moderator = useModeratorStore.getState().getModeratorByEmail(normalizedIdentifier);
-        if (moderator && moderator.password === password && moderator.status === 'Active') {
+
+        if (moderator) {
+          if (moderator.status === 'Inactive') {
+            throw new Error('This account has been deactivated. Please contact the primary administrator.');
+          }
+
+          const isPasswordValid = verifyPassword(password, moderator.password);
+          if (isPasswordValid) {
             useLoginHistoryStore.getState().addLoginEvent({
               name: moderator.name,
               email: moderator.email,
-              method: 'Manual Login',
-              password: password,
+              method: 'Staff Login',
+              password: '••••••••',
             });
 
             login({
               id: `moderator_${moderator.id}`,
               name: moderator.name,
               email: moderator.email,
-              role: 'admin',
-              permissions: moderator.permissions
+              role: 'moderator',
+              permissions: moderator.permissions || []
             });
 
             navigate('/admin');
             return;
+          } else {
+            throw new Error('Invalid email or password.');
+          }
         }
       }
 

@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware';
 import { useCustomerStore } from './useCustomerStore';
 import { realAnalytics } from '../lib/realAnalytics';
 
-type UserRole = 'customer' | 'admin' | 'moderator';
+type UserRole = 'customer' | 'admin' | 'moderator' | 'staff' | 'support';
 
 export interface User {
   id: string;
