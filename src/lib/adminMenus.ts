@@ -6,6 +6,7 @@ import {
   Package, 
   Grid,
   Shield,
+  ShieldAlert,
   CreditCard,
   Activity,
   Zap,
@@ -87,7 +88,7 @@ export const defaultNavItems: NavItem[] = [
     subItems: [
       { name: 'Complete Orders', path: '/admin/orders/complete', icon: CheckCircle },
       { name: 'Incomplete Orders', path: '/admin/orders/incomplete', icon: AlertCircle },
-      { name: 'Fake Order Control', path: '/admin/orders/fake-control', icon: Shield }
+      { name: 'Fraud Checker', path: '/admin/orders/fraud-checker', icon: ShieldAlert }
     ]
   },
   { 
@@ -240,11 +241,12 @@ export const defaultNavItems: NavItem[] = [
     ]
   },
   { 
-    name: 'Delivery Methods',
+    name: 'Courier',
     icon: Truck,
     moduleId: 'delivery',
     subItems: [
-      { name: 'Delivery API', path: '/admin/delivery/courier-api', icon: Radio }
+      { name: 'Add Courier', path: '/admin/courier/add', icon: Plus },
+      { name: 'Courier Listing', path: '/admin/courier/list', icon: Truck }
     ]
   },
   { 

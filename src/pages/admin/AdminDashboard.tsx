@@ -99,6 +99,8 @@ import AdminMenuManagement from './AdminMenuManagement';
 import AdminPopupManagement from './AdminPopupManagement';
 import AdminCourierAPI from './AdminCourierAPI';
 import AdminCourierCharges from './AdminCourierCharges';
+import AdminAddCourier from './courier/AdminAddCourier';
+import AdminCourierList from './courier/AdminCourierList';
 import AdminLoginInfo from './AdminLoginInfo';
 import AdminAuthImages from './AdminAuthImages';
 import AdminPromoCodes from './AdminPromoCodes';
@@ -774,6 +776,10 @@ export default function AdminDashboard() {
               <Route path="/management/popup-management" element={<PermissionGate moduleId="campaigns"><AdminPopupManagement /></PermissionGate>} />
               <Route path="/delivery/courier-api" element={<PermissionGate moduleId="delivery"><AdminCourierAPI /></PermissionGate>} />
               <Route path="/delivery/courier-charge" element={<PermissionGate moduleId="delivery"><AdminCourierCharges /></PermissionGate>} />
+              <Route path="/courier/add" element={<PermissionGate moduleId="delivery"><AdminAddCourier /></PermissionGate>} />
+              <Route path="/courier/edit/:id" element={<PermissionGate moduleId="delivery"><AdminAddCourier /></PermissionGate>} />
+              <Route path="/courier/list" element={<PermissionGate moduleId="delivery"><AdminCourierList /></PermissionGate>} />
+              <Route path="/courier" element={<PermissionGate moduleId="delivery"><AdminCourierList /></PermissionGate>} />
               <Route path="/game-control" element={<PermissionGate moduleId="settings"><AdminBarControl /></PermissionGate>} />
               <Route path="/coin-control" element={<PermissionGate moduleId="settings"><AdminBarControl /></PermissionGate>} />
               <Route path="/bar-control" element={<PermissionGate moduleId="settings"><AdminBarControl /></PermissionGate>} />

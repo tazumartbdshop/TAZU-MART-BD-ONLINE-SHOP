@@ -4387,62 +4387,152 @@ Please ask me your query or select a quick question template below!`;
     }
   });
 
-  // Helper to load Steadfast Courier credentials securely on server
-  async function getSteadfastCredentials(): Promise<{ apiKey: string; secretKey: string; apiUrl: string } | null> {
-    // 1. Check environment variables
-    if (process.env.STEADFAST_API_KEY && process.env.STEADFAST_SECRET_KEY) {
-      return {
-        apiKey: process.env.STEADFAST_API_KEY.trim(),
-        secretKey: process.env.STEADFAST_SECRET_KEY.trim(),
-        apiUrl: (process.env.STEADFAST_API_URL || 'https://portal.steadfast.com.bd/api/v1').trim()
-      };
+  // ==========================================
+  // MULTI-COURIER & SECURE FRAUD CHECKER ENGINE
+  // ==========================================
+
+  interface ServerCourier {
+    id: string;
+    name: string;
+    logoUrl?: string;
+    websiteUrl?: string;
+    apiBaseUrl?: string;
+    authType: 'api_key_secret' | 'bearer_token' | 'basic_auth' | 'custom_headers' | 'none';
+    apiKey?: string;
+    secretKey?: string;
+    accessToken?: string;
+    clientId?: string;
+    storeId?: string;
+    username?: string;
+    password?: string;
+    phoneSearchEndpoint?: string;
+    orderHistoryEndpoint?: string;
+    trackingEndpoint?: string;
+    statusEndpoint?: string;
+    webhookUrl?: string;
+    webhookSecret?: string;
+    requestMethod: 'GET' | 'POST';
+    requiredHeaders?: string;
+    mappingType: 'steadfast' | 'pathao' | 'redx' | 'generic';
+    status: 'active' | 'inactive';
+    lastTestedAt?: string;
+    lastTestStatus?: 'connected' | 'failed' | 'untested';
+    lastTestMessage?: string;
+    createdAt: string;
+    updatedAt: string;
+  }
+
+  // Authentic default courier templates
+  const DEFAULT_COURIER_TEMPLATES: ServerCourier[] = [
+    {
+      id: 'steadfast',
+      name: 'Steadfast Courier',
+      logoUrl: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=120&q=80',
+      websiteUrl: 'https://steadfast.com.bd',
+      apiBaseUrl: 'https://portal.steadfast.com.bd/api/v1',
+      authType: 'api_key_secret',
+      apiKey: '',
+      secretKey: '',
+      phoneSearchEndpoint: '/fraud_check/{phone}',
+      orderHistoryEndpoint: '/status_by_cid/{cid}',
+      trackingEndpoint: '/status_by_trackingcode/{code}',
+      statusEndpoint: '/get_balance',
+      requestMethod: 'GET',
+      mappingType: 'steadfast',
+      status: 'active',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    },
+    {
+      id: 'pathao',
+      name: 'Pathao Courier',
+      logoUrl: 'https://images.unsplash.com/photo-1526367790999-0150786686a2?auto=format&fit=crop&w=120&q=80',
+      websiteUrl: 'https://pathao.com',
+      apiBaseUrl: 'https://api-hermes.pathao.com/aladdin/api/v1',
+      authType: 'bearer_token',
+      accessToken: '',
+      phoneSearchEndpoint: '/orders?phone={phone}',
+      orderHistoryEndpoint: '/orders/{id}',
+      trackingEndpoint: '/orders/{id}',
+      statusEndpoint: '/user/profile',
+      requestMethod: 'GET',
+      mappingType: 'pathao',
+      status: 'active',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    },
+    {
+      id: 'redx',
+      name: 'RedX',
+      logoUrl: 'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?auto=format&fit=crop&w=120&q=80',
+      websiteUrl: 'https://redx.com.bd',
+      apiBaseUrl: 'https://openapi.redx.com.bd/v1.0.0-beta',
+      authType: 'bearer_token',
+      accessToken: '',
+      phoneSearchEndpoint: '/orders?phone={phone}',
+      orderHistoryEndpoint: '/parcels/{id}',
+      trackingEndpoint: '/parcels/{id}',
+      statusEndpoint: '/pickup-stores',
+      requestMethod: 'GET',
+      mappingType: 'redx',
+      status: 'active',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    }
+  ];
+
+  // Load couriers list from database with fallback & migration of existing credentials
+  async function loadCouriersList(): Promise<ServerCourier[]> {
+    const clientToUse = supabaseServiceRole || supabaseAdmin;
+
+    // 1. Try loading from settings id = 'courier_system'
+    try {
+      if (clientToUse) {
+        const { data, error } = await clientToUse
+          .from('settings')
+          .select('*')
+          .eq('id', 'courier_system')
+          .limit(1);
+
+        if (!error && data && data.length > 0) {
+          let list = data[0].couriers || data[0].value;
+          if (typeof list === 'string') {
+            try { list = JSON.parse(list); } catch (e) {}
+          }
+          if (Array.isArray(list) && list.length > 0) {
+            return list;
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("[Courier Store] Error loading courier_system settings:", err);
     }
 
-    // 2. Check Supabase 'settings' table where id = 'delivery'
+    // 2. Check existing settings id = 'delivery' to migrate existing configurations
+    let existingSteadfastKey = process.env.STEADFAST_API_KEY || '';
+    let existingSteadfastSecret = process.env.STEADFAST_SECRET_KEY || '';
+    let existingSteadfastUrl = process.env.STEADFAST_API_URL || '';
+
     try {
-      const clientToUse = supabaseServiceRole || supabaseAdmin;
       if (clientToUse) {
-        const { data, error } = await clientToUse.from('settings').select('*').eq('id', 'delivery').limit(1);
+        const { data, error } = await clientToUse
+          .from('settings')
+          .select('*')
+          .eq('id', 'delivery')
+          .limit(1);
+
         if (!error && data && data.length > 0) {
           let courierApis = data[0].courierApis;
           if (typeof courierApis === 'string') {
             try { courierApis = JSON.parse(courierApis); } catch(e) {}
           }
           if (Array.isArray(courierApis)) {
-            const steadfast = courierApis.find((c: any) => c.id === 'steadfast');
-            if (steadfast && steadfast.apiKey && steadfast.secretKey) {
-              return {
-                apiKey: String(steadfast.apiKey).trim(),
-                secretKey: String(steadfast.secretKey).trim(),
-                apiUrl: String(steadfast.apiUrl || 'https://portal.steadfast.com.bd/api/v1').trim()
-              };
+            const sf = courierApis.find((c: any) => c.id === 'steadfast');
+            if (sf) {
+              if (sf.apiKey) existingSteadfastKey = String(sf.apiKey).trim();
+              if (sf.secretKey) existingSteadfastSecret = String(sf.secretKey).trim();
+              if (sf.apiUrl) existingSteadfastUrl = String(sf.apiUrl).trim();
             }
-          }
-        }
-      }
-    } catch (err) {
-      console.warn("[Steadfast Credentials] Supabase check warning:", err);
-    }
-
-    // 3. Check Firestore fallback
-    try {
-      const db = await getFirestoreDatabaseInstance();
-      const docRef = db.collection('settings').doc('delivery');
-      const snap = await docRef.get();
-      if (snap.exists) {
-        const docData = snap.data();
-        let courierApis = docData?.courierApis;
-        if (typeof courierApis === 'string') {
-          try { courierApis = JSON.parse(courierApis); } catch(e) {}
-        }
-        if (Array.isArray(courierApis)) {
-          const steadfast = courierApis.find((c: any) => c.id === 'steadfast');
-          if (steadfast && steadfast.apiKey && steadfast.secretKey) {
-            return {
-              apiKey: String(steadfast.apiKey).trim(),
-              secretKey: String(steadfast.secretKey).trim(),
-              apiUrl: String(steadfast.apiUrl || 'https://portal.steadfast.com.bd/api/v1').trim()
-            };
           }
         }
       }
@@ -4450,7 +4540,104 @@ Please ask me your query or select a quick question template below!`;
       // non-blocking
     }
 
-    return null;
+    // Initialize default couriers with migrated credentials if present
+    const seeded = DEFAULT_COURIER_TEMPLATES.map(c => {
+      if (c.id === 'steadfast' && existingSteadfastKey) {
+        return {
+          ...c,
+          apiKey: existingSteadfastKey,
+          secretKey: existingSteadfastSecret,
+          apiBaseUrl: existingSteadfastUrl || c.apiBaseUrl,
+          status: 'active' as const
+        };
+      }
+      return c;
+    });
+
+    // Save initial seeded list
+    await saveCouriersList(seeded).catch(() => {});
+    return seeded;
+  }
+
+  // Save couriers list to database
+  async function saveCouriersList(couriers: ServerCourier[]): Promise<boolean> {
+    const clientToUse = supabaseServiceRole || supabaseAdmin;
+    try {
+      if (clientToUse) {
+        const { error } = await clientToUse
+          .from('settings')
+          .upsert([{
+            id: 'courier_system',
+            couriers: couriers,
+            updated_at: new Date().toISOString()
+          }]);
+        if (error) {
+          console.warn("[Courier Store] Supabase upsert error:", error);
+        } else {
+          return true;
+        }
+      }
+    } catch (err) {
+      console.warn("[Courier Store] DB save exception:", err);
+    }
+
+    // Firestore fallback
+    try {
+      const db = await getFirestoreDatabaseInstance();
+      await db.collection('settings').doc('courier_system').set({
+        couriers: couriers,
+        updated_at: new Date().toISOString()
+      }, { merge: true });
+      return true;
+    } catch (err) {
+      // fallback
+    }
+
+    return false;
+  }
+
+  // Mask credentials so secrets are NEVER exposed in client bundle / network inspect
+  function sanitizeCourierForClient(courier: ServerCourier) {
+    const masked: any = { ...courier };
+    if (masked.apiKey) {
+      masked.hasApiKey = true;
+      masked.apiKeyMasked = masked.apiKey.length > 4 
+        ? '••••••••' + masked.apiKey.slice(-4) 
+        : '••••••••';
+      delete masked.apiKey;
+    } else {
+      masked.hasApiKey = false;
+      masked.apiKeyMasked = '';
+    }
+
+    if (masked.secretKey) {
+      masked.hasSecretKey = true;
+      masked.secretKeyMasked = masked.secretKey.length > 4
+        ? '••••••••' + masked.secretKey.slice(-4)
+        : '••••••••';
+      delete masked.secretKey;
+    } else {
+      masked.hasSecretKey = false;
+      masked.secretKeyMasked = '';
+    }
+
+    if (masked.accessToken) {
+      masked.hasAccessToken = true;
+      masked.accessTokenMasked = masked.accessToken.length > 4
+        ? '••••••••' + masked.accessToken.slice(-4)
+        : '••••••••';
+      delete masked.accessToken;
+    } else {
+      masked.hasAccessToken = false;
+      masked.accessTokenMasked = '';
+    }
+
+    if (masked.password) {
+      masked.hasPassword = true;
+      delete masked.password;
+    }
+
+    return masked;
   }
 
   // Validate and normalize Bangladeshi mobile numbers
@@ -4487,11 +4674,362 @@ Please ask me your query or select a quick question template below!`;
     return { valid: true, normalized: digits };
   }
 
-  // Handle Steadfast Courier fraud check request
-  async function executeFraudCheck(rawPhone: string, res: express.Response) {
+  // REST API: Get all couriers (Safe / Masked)
+  app.get("/api/admin/couriers", async (req, res) => {
+    try {
+      res.setHeader('Content-Type', 'application/json');
+      const couriers = await loadCouriersList();
+      return res.json({
+        success: true,
+        couriers: couriers.map(sanitizeCourierForClient)
+      });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // REST API: Get single courier
+  app.get("/api/admin/couriers/:id", async (req, res) => {
+    try {
+      res.setHeader('Content-Type', 'application/json');
+      const couriers = await loadCouriersList();
+      const found = couriers.find(c => c.id === req.params.id);
+      if (!found) {
+        return res.status(404).json({ success: false, error: "Courier not found" });
+      }
+      return res.json({ success: true, courier: sanitizeCourierForClient(found) });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // REST API: Add new courier
+  app.post("/api/admin/couriers", async (req, res) => {
+    try {
+      res.setHeader('Content-Type', 'application/json');
+      const body = req.body || {};
+
+      if (!body.name || !body.name.trim()) {
+        return res.status(400).json({ success: false, error: "Courier Name is required." });
+      }
+
+      const couriers = await loadCouriersList();
+      const id = (body.id || body.name.toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + Date.now().toString(36)).trim();
+
+      const newCourier: ServerCourier = {
+        id,
+        name: body.name.trim(),
+        logoUrl: body.logoUrl || '',
+        websiteUrl: body.websiteUrl || '',
+        apiBaseUrl: (body.apiBaseUrl || '').trim().replace(/\/+$/, ''),
+        authType: body.authType || 'api_key_secret',
+        apiKey: body.apiKey ? String(body.apiKey).trim() : '',
+        secretKey: body.secretKey ? String(body.secretKey).trim() : '',
+        accessToken: body.accessToken ? String(body.accessToken).trim() : '',
+        clientId: body.clientId || '',
+        storeId: body.storeId || '',
+        username: body.username || '',
+        password: body.password || '',
+        phoneSearchEndpoint: body.phoneSearchEndpoint || '/fraud_check/{phone}',
+        orderHistoryEndpoint: body.orderHistoryEndpoint || '',
+        trackingEndpoint: body.trackingEndpoint || '',
+        statusEndpoint: body.statusEndpoint || '',
+        webhookUrl: body.webhookUrl || '',
+        webhookSecret: body.webhookSecret || '',
+        requestMethod: body.requestMethod === 'POST' ? 'POST' : 'GET',
+        requiredHeaders: body.requiredHeaders || '',
+        mappingType: body.mappingType || 'generic',
+        status: body.status === 'inactive' ? 'inactive' : 'active',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      couriers.push(newCourier);
+      await saveCouriersList(couriers);
+
+      return res.json({
+        success: true,
+        message: "Courier created successfully",
+        courier: sanitizeCourierForClient(newCourier)
+      });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // REST API: Update courier
+  app.put("/api/admin/couriers/:id", async (req, res) => {
+    try {
+      res.setHeader('Content-Type', 'application/json');
+      const { id } = req.params;
+      const body = req.body || {};
+
+      const couriers = await loadCouriersList();
+      const index = couriers.findIndex(c => c.id === id);
+      if (index === -1) {
+        return res.status(404).json({ success: false, error: "Courier not found" });
+      }
+
+      const existing = couriers[index];
+
+      // Handle secrets: preserve existing value if input is masked or empty
+      let updatedApiKey = existing.apiKey;
+      if (body.apiKey !== undefined && !body.apiKey.startsWith('••••') && body.apiKey.trim() !== '') {
+        updatedApiKey = String(body.apiKey).trim();
+      }
+
+      let updatedSecretKey = existing.secretKey;
+      if (body.secretKey !== undefined && !body.secretKey.startsWith('••••') && body.secretKey.trim() !== '') {
+        updatedSecretKey = String(body.secretKey).trim();
+      }
+
+      let updatedAccessToken = existing.accessToken;
+      if (body.accessToken !== undefined && !body.accessToken.startsWith('••••') && body.accessToken.trim() !== '') {
+        updatedAccessToken = String(body.accessToken).trim();
+      }
+
+      let updatedPassword = existing.password;
+      if (body.password !== undefined && !body.password.startsWith('••••') && body.password.trim() !== '') {
+        updatedPassword = String(body.password).trim();
+      }
+
+      const updatedCourier: ServerCourier = {
+        ...existing,
+        name: body.name !== undefined ? body.name.trim() : existing.name,
+        logoUrl: body.logoUrl !== undefined ? body.logoUrl : existing.logoUrl,
+        websiteUrl: body.websiteUrl !== undefined ? body.websiteUrl : existing.websiteUrl,
+        apiBaseUrl: body.apiBaseUrl !== undefined ? String(body.apiBaseUrl).trim().replace(/\/+$/, '') : existing.apiBaseUrl,
+        authType: body.authType !== undefined ? body.authType : existing.authType,
+        apiKey: updatedApiKey,
+        secretKey: updatedSecretKey,
+        accessToken: updatedAccessToken,
+        clientId: body.clientId !== undefined ? body.clientId : existing.clientId,
+        storeId: body.storeId !== undefined ? body.storeId : existing.storeId,
+        username: body.username !== undefined ? body.username : existing.username,
+        password: updatedPassword,
+        phoneSearchEndpoint: body.phoneSearchEndpoint !== undefined ? body.phoneSearchEndpoint : existing.phoneSearchEndpoint,
+        orderHistoryEndpoint: body.orderHistoryEndpoint !== undefined ? body.orderHistoryEndpoint : existing.orderHistoryEndpoint,
+        trackingEndpoint: body.trackingEndpoint !== undefined ? body.trackingEndpoint : existing.trackingEndpoint,
+        statusEndpoint: body.statusEndpoint !== undefined ? body.statusEndpoint : existing.statusEndpoint,
+        webhookUrl: body.webhookUrl !== undefined ? body.webhookUrl : existing.webhookUrl,
+        webhookSecret: body.webhookSecret !== undefined ? body.webhookSecret : existing.webhookSecret,
+        requestMethod: body.requestMethod !== undefined ? (body.requestMethod === 'POST' ? 'POST' : 'GET') : existing.requestMethod,
+        requiredHeaders: body.requiredHeaders !== undefined ? body.requiredHeaders : existing.requiredHeaders,
+        mappingType: body.mappingType !== undefined ? body.mappingType : existing.mappingType,
+        status: body.status !== undefined ? (body.status === 'active' ? 'active' : 'inactive') : existing.status,
+        updatedAt: new Date().toISOString()
+      };
+
+      couriers[index] = updatedCourier;
+      await saveCouriersList(couriers);
+
+      return res.json({
+        success: true,
+        message: "Courier updated successfully",
+        courier: sanitizeCourierForClient(updatedCourier)
+      });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // REST API: Delete courier
+  app.delete("/api/admin/couriers/:id", async (req, res) => {
+    try {
+      res.setHeader('Content-Type', 'application/json');
+      const { id } = req.params;
+      const couriers = await loadCouriersList();
+      const filtered = couriers.filter(c => c.id !== id);
+
+      if (filtered.length === couriers.length) {
+        return res.status(404).json({ success: false, error: "Courier not found" });
+      }
+
+      await saveCouriersList(filtered);
+      return res.json({ success: true, message: "Courier deleted successfully" });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // REST API: Real Test Connection
+  app.post("/api/admin/couriers/:id/test", async (req, res) => {
+    try {
+      res.setHeader('Content-Type', 'application/json');
+      const { id } = req.params;
+      const couriers = await loadCouriersList();
+      const index = couriers.findIndex(c => c.id === id);
+      if (index === -1) {
+        return res.status(404).json({ success: false, error: "Courier not found" });
+      }
+
+      const courier = couriers[index];
+      const startTime = Date.now();
+
+      if (!courier.apiBaseUrl) {
+        return res.status(400).json({
+          success: false,
+          error: "API Base URL is required to test connection."
+        });
+      }
+
+      let testUrl = courier.apiBaseUrl;
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      };
+
+      // Apply custom headers if defined
+      if (courier.requiredHeaders) {
+        try {
+          const parsed = JSON.parse(courier.requiredHeaders);
+          Object.assign(headers, parsed);
+        } catch (e) {
+          // ignore
+        }
+      }
+
+      // Configure authentication & test target
+      if (courier.mappingType === 'steadfast' || courier.authType === 'api_key_secret') {
+        if (!courier.apiKey || !courier.secretKey) {
+          return res.status(200).json({
+            success: false,
+            error: "API Key and Secret Key are required to test Steadfast connection."
+          });
+        }
+        headers['Api-Key'] = courier.apiKey;
+        headers['Secret-Key'] = courier.secretKey;
+        // Use balance or test ping endpoint
+        testUrl = `${courier.apiBaseUrl}/get_balance`;
+      } else if (courier.authType === 'bearer_token') {
+        if (!courier.accessToken) {
+          return res.status(200).json({
+            success: false,
+            error: "Access Token is required to test Bearer Token connection."
+          });
+        }
+        headers['Authorization'] = `Bearer ${courier.accessToken}`;
+        if (courier.statusEndpoint) {
+          testUrl = `${courier.apiBaseUrl}${courier.statusEndpoint.startsWith('/') ? '' : '/'}${courier.statusEndpoint}`;
+        }
+      } else if (courier.authType === 'basic_auth') {
+        const credentials = Buffer.from(`${courier.username || courier.apiKey || ''}:${courier.password || courier.secretKey || ''}`).toString('base64');
+        headers['Authorization'] = `Basic ${credentials}`;
+        if (courier.statusEndpoint) {
+          testUrl = `${courier.apiBaseUrl}${courier.statusEndpoint.startsWith('/') ? '' : '/'}${courier.statusEndpoint}`;
+        }
+      } else if (courier.statusEndpoint) {
+        testUrl = `${courier.apiBaseUrl}${courier.statusEndpoint.startsWith('/') ? '' : '/'}${courier.statusEndpoint}`;
+      }
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+      try {
+        const pingResponse = await fetch(testUrl, {
+          method: 'GET',
+          headers,
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
+        const latencyMs = Date.now() - startTime;
+        const status = pingResponse.status;
+        const responseText = await pingResponse.text();
+        let parsedJson: any = null;
+        try { parsedJson = JSON.parse(responseText); } catch(e) {}
+
+        // Evaluate connection result
+        let isSuccess = false;
+        let message = '';
+
+        if (status >= 200 && status < 300) {
+          isSuccess = true;
+          message = `API Connected (${latencyMs}ms)`;
+        } else if (status === 401 || status === 403) {
+          isSuccess = false;
+          message = `Authentication Failed (${status}): Please check your API Key / Secret credentials.`;
+        } else if (status === 404 && parsedJson && typeof parsedJson === 'object') {
+          // If server responded with valid courier JSON (even 404 not found route), the host & credentials reached successfully
+          isSuccess = true;
+          message = `API Host Reachable (${latencyMs}ms)`;
+        } else {
+          isSuccess = false;
+          message = `Connection Failed (${status}): ${parsedJson?.message || responseText.slice(0, 100) || pingResponse.statusText}`;
+        }
+
+        // Update courier record with real test status
+        couriers[index] = {
+          ...courier,
+          lastTestedAt: new Date().toISOString(),
+          lastTestStatus: isSuccess ? 'connected' : 'failed',
+          lastTestMessage: message
+        };
+        await saveCouriersList(couriers);
+
+        return res.json({
+          success: isSuccess,
+          message,
+          status,
+          latencyMs,
+          apiUrl: testUrl
+        });
+      } catch (fetchErr: any) {
+        clearTimeout(timeoutId);
+        const latencyMs = Date.now() - startTime;
+        const errMsg = fetchErr.name === 'AbortError' 
+          ? 'Connection timed out (10s limit). Please check API Base URL.' 
+          : `Network error: ${fetchErr.message || 'Unable to connect'}`;
+
+        couriers[index] = {
+          ...courier,
+          lastTestedAt: new Date().toISOString(),
+          lastTestStatus: 'failed',
+          lastTestMessage: errMsg
+        };
+        await saveCouriersList(couriers);
+
+        return res.json({
+          success: false,
+          error: errMsg,
+          latencyMs
+        });
+      }
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // REST API: Dynamic Multi-Courier Fraud Checker Status
+  app.get("/api/admin/fraud-check/status", async (req, res) => {
+    try {
+      res.setHeader('Content-Type', 'application/json');
+      const couriers = await loadCouriersList();
+      const activeCouriers = couriers.filter(c => c.status === 'active');
+      const configuredCouriers = activeCouriers.filter(c => {
+        if (c.authType === 'api_key_secret') return !!(c.apiKey && c.secretKey);
+        if (c.authType === 'bearer_token') return !!c.accessToken;
+        return !!c.apiBaseUrl;
+      });
+
+      return res.json({
+        success: true,
+        totalCouriers: couriers.length,
+        activeCount: activeCouriers.length,
+        configuredCount: configuredCouriers.length,
+        couriers: activeCouriers.map(sanitizeCourierForClient)
+      });
+    } catch (err: any) {
+      return res.json({ success: false, error: err.message });
+    }
+  });
+
+  // REAL Dynamic Multi-Courier Fraud Check Handler (NO FAKE / NO DUMMY DATA)
+  async function handleDynamicFraudCheck(courierId: string | undefined, rawPhone: string, res: express.Response) {
     try {
       res.setHeader('Content-Type', 'application/json');
 
+      // 1. Phone Number Validation
       const phoneValidation = normalizeBDPhoneNumber(rawPhone);
       if (!phoneValidation.valid) {
         return res.status(400).json({
@@ -4499,179 +5037,276 @@ Please ask me your query or select a quick question template below!`;
           error: phoneValidation.error || 'Invalid mobile number'
         });
       }
-
       const normalizedPhone = phoneValidation.normalized;
 
-      const credentials = await getSteadfastCredentials();
-      if (!credentials || !credentials.apiKey || !credentials.secretKey) {
+      // 2. Select Courier
+      const couriers = await loadCouriersList();
+      let targetCourier: ServerCourier | undefined;
+
+      if (courierId) {
+        targetCourier = couriers.find(c => c.id === courierId);
+      } else {
+        // Default to first active courier that has credentials
+        targetCourier = couriers.find(c => c.status === 'active' && ((c.apiKey && c.secretKey) || c.accessToken)) 
+                     || couriers.find(c => c.status === 'active');
+      }
+
+      if (!targetCourier) {
         return res.status(200).json({
           success: false,
-          configured: false,
-          error: "Steadfast Courier API is not configured. Please add your API Key and Secret Key in Courier Integration."
+          error: "No active courier service found. Please add or activate a courier in Courier Listing."
         });
       }
 
-      let baseUrl = (credentials.apiUrl || 'https://portal.steadfast.com.bd/api/v1').trim().replace(/\/+$/, '');
-      if (!baseUrl.includes('/api/v1')) {
+      if (targetCourier.status !== 'active') {
+        return res.status(200).json({
+          success: false,
+          error: `Courier "${targetCourier.name}" is inactive. Please activate it in Courier Listing.`
+        });
+      }
+
+      // Check credentials for target courier
+      const isSteadfast = targetCourier.mappingType === 'steadfast' || targetCourier.id === 'steadfast';
+      if (isSteadfast) {
+        if (!targetCourier.apiKey || !targetCourier.secretKey) {
+          return res.status(200).json({
+            success: false,
+            configured: false,
+            courier: sanitizeCourierForClient(targetCourier),
+            error: `Steadfast Courier API credentials are not configured. Please add API Key & Secret Key in Courier section.`
+          });
+        }
+      } else if (targetCourier.authType === 'bearer_token' && !targetCourier.accessToken) {
+        return res.status(200).json({
+          success: false,
+          configured: false,
+          courier: sanitizeCourierForClient(targetCourier),
+          error: `${targetCourier.name} Access Token is not configured.`
+        });
+      }
+
+      let baseUrl = (targetCourier.apiBaseUrl || '').trim().replace(/\/+$/, '');
+      if (isSteadfast && !baseUrl.includes('/api/v1')) {
         baseUrl = `${baseUrl}/api/v1`;
       }
-      const targetUrl = `${baseUrl}/fraud_check/${normalizedPhone}`;
 
+      // Determine Target Endpoint
+      let endpointPath = (targetCourier.phoneSearchEndpoint || '/fraud_check/{phone}').trim();
+      endpointPath = endpointPath.replace(/\{phone\}/g, normalizedPhone);
+      if (!endpointPath.startsWith('/')) {
+        endpointPath = `/${endpointPath}`;
+      }
+
+      const fullUrl = `${baseUrl}${endpointPath}`;
+
+      // Build Headers
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      };
+
+      if (targetCourier.requiredHeaders) {
+        try {
+          Object.assign(headers, JSON.parse(targetCourier.requiredHeaders));
+        } catch(e) {}
+      }
+
+      if (isSteadfast || targetCourier.authType === 'api_key_secret') {
+        if (targetCourier.apiKey) headers['Api-Key'] = targetCourier.apiKey;
+        if (targetCourier.secretKey) headers['Secret-Key'] = targetCourier.secretKey;
+      } else if (targetCourier.authType === 'bearer_token') {
+        headers['Authorization'] = `Bearer ${targetCourier.accessToken}`;
+      } else if (targetCourier.authType === 'basic_auth') {
+        const credentials = Buffer.from(`${targetCourier.username || targetCourier.apiKey || ''}:${targetCourier.password || targetCourier.secretKey || ''}`).toString('base64');
+        headers['Authorization'] = `Basic ${credentials}`;
+      }
+
+      // Execute Real Courier API Call with Timeout
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      const timeoutId = setTimeout(() => controller.abort(), 12000);
 
-      let apiResponse;
+      let apiResponse: any;
       try {
-        apiResponse = await fetch(targetUrl, {
-          method: 'GET',
-          headers: {
-            'Api-Key': credentials.apiKey,
-            'Secret-Key': credentials.secretKey,
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          },
+        apiResponse = await fetch(fullUrl, {
+          method: targetCourier.requestMethod || 'GET',
+          headers,
           signal: controller.signal
         });
       } catch (fetchErr: any) {
         clearTimeout(timeoutId);
         if (fetchErr.name === 'AbortError') {
-          return res.status(504).json({
+          return res.status(200).json({
             success: false,
-            error: "Steadfast Courier API request timed out (10s limit). Please check your internet connection or try again."
+            error: `Unable to fetch courier data: ${targetCourier.name} API request timed out (12s limit).`
           });
         }
-        return res.status(502).json({
+        return res.status(200).json({
           success: false,
-          error: `Could not connect to Steadfast Courier API: ${fetchErr.message || 'Network error'}`
+          error: `Unable to fetch courier data. Please check courier API connection (${fetchErr.message || 'Network error'}).`
         });
       }
       clearTimeout(timeoutId);
 
+      // Handle Authentication Failure
       if (apiResponse.status === 401 || apiResponse.status === 403) {
         return res.status(200).json({
           success: false,
           configured: true,
-          error: "Authentication failed with Steadfast Courier. Please check your API Key and Secret Key."
+          courier: sanitizeCourierForClient(targetCourier),
+          error: `Unable to fetch courier data: Authentication failed with ${targetCourier.name}. Please check API credentials.`
         });
       }
 
+      // Handle 404 (No history found)
       if (apiResponse.status === 404) {
         return res.status(200).json({
           success: true,
           configured: true,
+          courier: sanitizeCourierForClient(targetCourier),
           phone: normalizedPhone,
           found: false,
-          message: "No delivery history found for this number in Steadfast Courier."
+          message: "No courier history found for this phone number."
         });
       }
 
-      const responseJson: any = await apiResponse.json().catch(() => null);
-
-      if (!responseJson) {
-        return res.status(502).json({
+      const responseText = await apiResponse.text();
+      let responseJson: any = null;
+      try {
+        responseJson = JSON.parse(responseText);
+      } catch (e) {
+        return res.status(200).json({
           success: false,
-          error: "Invalid JSON response received from Steadfast Courier API."
+          error: "Data not available from this courier API (Non-JSON response received)."
         });
       }
 
-      // Check for error or not found status within JSON response
-      if (responseJson.status === 404 || (responseJson.message && typeof responseJson.message === 'string' && responseJson.message.toLowerCase().includes('not found'))) {
+      // Check if courier returns not found in payload
+      if (responseJson.status === 404 || 
+         (typeof responseJson.message === 'string' && responseJson.message.toLowerCase().includes('not found'))) {
         return res.status(200).json({
           success: true,
           configured: true,
+          courier: sanitizeCourierForClient(targetCourier),
           phone: normalizedPhone,
           found: false,
-          message: responseJson.message || "No delivery history found for this number in Steadfast Courier."
+          message: "No courier history found for this phone number."
         });
       }
 
-      if (responseJson.status && responseJson.status !== 200 && responseJson.message) {
-        return res.status(200).json({
-          success: false,
-          configured: true,
-          error: `Steadfast API Error: ${responseJson.message}`
-        });
-      }
-
+      // Parse payload based on real courier response fields
       const payload = responseJson.data || responseJson;
 
       const totalParcelsRaw = payload.total_parcels ?? payload.Total_parcels ?? payload.total_orders ?? payload.total ?? null;
       const totalDeliveredRaw = payload.total_delivered ?? payload.Total_delivered ?? payload.delivered ?? null;
       const totalCancelledRaw = payload.total_cancelled ?? payload.Total_cancelled ?? payload.cancelled ?? payload.canceled ?? null;
+      const totalReturnedRaw = payload.total_returned ?? payload.Total_returned ?? payload.returned ?? null;
+      const totalPendingRaw = payload.total_pending ?? payload.Total_pending ?? payload.pending ?? null;
+      const totalPartialDeliveredRaw = payload.total_partial_delivered ?? payload.partial_delivered ?? null;
       const totalFraudReportsRaw = payload.total_fraud_reports ?? payload.Total_fraud_reports ?? payload.fraud_reports ?? null;
 
-      // If no valid parcel fields exist
-      if (totalParcelsRaw === null && totalDeliveredRaw === null && totalCancelledRaw === null) {
+      // Extract real parcels array if the courier provides history
+      let rawParcelsList: any[] = [];
+      if (Array.isArray(payload.parcels)) {
+        rawParcelsList = payload.parcels;
+      } else if (Array.isArray(payload.orders)) {
+        rawParcelsList = payload.orders;
+      } else if (Array.isArray(payload.history)) {
+        rawParcelsList = payload.history;
+      } else if (Array.isArray(responseJson.data) && Array.isArray(responseJson.data)) {
+        rawParcelsList = responseJson.data;
+      }
+
+      // Map parcel items ONLY if real fields exist (do NOT invent dummy fields)
+      const parcels = rawParcelsList.map((p: any) => ({
+        consignmentId: p.consignment_id || p.order_id || p.cid || p.id || '',
+        trackingCode: p.tracking_code || p.tracking_id || p.trackingCode || '',
+        orderDate: p.created_at || p.order_date || p.date || '',
+        status: p.status || p.delivery_status || '',
+        deliveryDate: p.delivery_date || p.delivered_at || null,
+        codAmount: p.cod_amount ?? p.amount ?? p.total_amount ?? null,
+        currentHub: p.current_hub || p.hub || p.location || null,
+        trackingLink: p.tracking_url || p.tracking_link || null
+      })).filter(p => p.consignmentId || p.trackingCode || p.status);
+
+      // If no valid parcel fields exist and no parcel records
+      if (totalParcelsRaw === null && totalDeliveredRaw === null && totalCancelledRaw === null && parcels.length === 0) {
         return res.status(200).json({
           success: true,
           configured: true,
+          courier: sanitizeCourierForClient(targetCourier),
           phone: normalizedPhone,
           found: false,
-          message: responseJson.message || "No delivery history found for this number in Steadfast Courier."
+          message: "No courier history found for this phone number."
         });
       }
 
-      const totalParcels = Number(totalParcelsRaw || 0);
-      const totalDelivered = Number(totalDeliveredRaw || 0);
+      const totalParcels = totalParcelsRaw !== null ? Number(totalParcelsRaw) : (parcels.length > 0 ? parcels.length : 0);
+      const totalDelivered = totalDeliveredRaw !== null ? Number(totalDeliveredRaw) : (parcels.filter(p => /delivered/i.test(p.status)).length);
       const totalCancelled = totalCancelledRaw !== null ? Number(totalCancelledRaw) : null;
+      const totalReturned = totalReturnedRaw !== null ? Number(totalReturnedRaw) : null;
+      const totalPending = totalPendingRaw !== null ? Number(totalPendingRaw) : null;
+      const totalPartialDelivered = totalPartialDeliveredRaw !== null ? Number(totalPartialDeliveredRaw) : null;
       const totalFraudReports = totalFraudReportsRaw !== null ? Number(totalFraudReportsRaw) : 0;
 
-      let successRate: number | null = null;
-      if (totalParcels > 0) {
-        successRate = Math.min(100, Math.max(0, Math.round((totalDelivered / totalParcels) * 100)));
+      // Delivery / Success percentage calculated ONLY when required real counts are available
+      let deliverySuccessRate: number | null = null;
+      if (totalParcels > 0 && totalDelivered >= 0) {
+        deliverySuccessRate = Math.min(100, Math.max(0, Math.round((totalDelivered / totalParcels) * 100)));
+      }
+
+      const hasHistory = totalParcels > 0 || totalDelivered > 0 || (totalCancelled !== null && totalCancelled > 0) || parcels.length > 0;
+
+      if (!hasHistory) {
+        return res.status(200).json({
+          success: true,
+          configured: true,
+          courier: sanitizeCourierForClient(targetCourier),
+          phone: normalizedPhone,
+          found: false,
+          message: "No courier history found for this phone number."
+        });
       }
 
       return res.status(200).json({
         success: true,
         configured: true,
+        courier: sanitizeCourierForClient(targetCourier),
         phone: normalizedPhone,
-        found: totalParcels > 0 || totalDelivered > 0 || (totalCancelled !== null && totalCancelled > 0),
+        found: true,
         data: {
           totalParcels,
           totalDelivered,
           totalCancelled,
+          totalReturned,
+          totalPending,
+          totalPartialDelivered,
           totalFraudReports,
-          deliverySuccessRate: successRate,
-          raw: {
-            total_parcels: totalParcelsRaw,
-            total_delivered: totalDeliveredRaw,
-            total_cancelled: totalCancelledRaw,
-            total_fraud_reports: totalFraudReportsRaw
-          }
+          deliverySuccessRate,
+          parcels: parcels.length > 0 ? parcels : undefined
         }
       });
     } catch (err: any) {
-      console.error("[Fraud Check Execution Error]:", err);
+      console.error("[Dynamic Fraud Check Error]:", err);
       return res.status(500).json({
         success: false,
-        error: `Internal server error: ${err.message || 'Unknown error'}`
+        error: `Unable to fetch courier data. Please check courier API connection (${err.message || 'Internal error'}).`
       });
     }
   }
 
-  // Endpoints for Fraud Checker
-  app.get("/api/admin/fraud-check/status", async (req, res) => {
-    try {
-      res.setHeader('Content-Type', 'application/json');
-      const creds = await getSteadfastCredentials();
-      return res.json({
-        configured: !!(creds && creds.apiKey && creds.secretKey),
-        apiUrl: creds?.apiUrl || 'https://portal.steadfast.com.bd/api/v1'
-      });
-    } catch (err: any) {
-      return res.json({ configured: false, error: err.message });
-    }
-  });
-
+  // Multi-Courier Fraud Check endpoints
   app.get("/api/admin/fraud-check", async (req, res) => {
-    const phoneParam = (req.query.phone as string) || '';
-    return executeFraudCheck(phoneParam, res);
+    const phone = (req.query.phone as string) || '';
+    const courierId = (req.query.courierId as string) || (req.query.courier_id as string) || undefined;
+    return handleDynamicFraudCheck(courierId, phone, res);
   });
 
   app.post("/api/admin/fraud-check", async (req, res) => {
-    const phoneParam = req.body?.phone || req.query?.phone || '';
-    return executeFraudCheck(phoneParam, res);
+    const phone = req.body?.phone || req.query?.phone || '';
+    const courierId = req.body?.courierId || req.body?.courier_id || req.query?.courierId || undefined;
+    return handleDynamicFraudCheck(courierId, phone, res);
   });
+
 
   app.post("/api/admin/create-customer", async (req, res) => {
     try {

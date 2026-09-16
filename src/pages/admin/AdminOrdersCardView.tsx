@@ -42,6 +42,7 @@ import { formatPrice } from '../../lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { getCompletedOrdersCount, LoyaltyBadge, VerifiedTick } from '../../lib/loyalty';
+import { useCourierStore } from '../../store/useCourierStore';
 
 
 import PremiumOrderAdd from './PremiumOrderAdd';
@@ -144,6 +145,7 @@ export default function AdminOrdersCardView() {
   const { orders, updateOrderStatus } = useOrderStore();
   const { customers, fetchCustomers } = useCustomerStore();
   const { products } = useProductStore();
+  const { couriers, fetchCouriers } = useCourierStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [viewType, setViewType] = useState<'Online' | 'Offline' | 'All'>('All');
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
@@ -152,7 +154,8 @@ export default function AdminOrdersCardView() {
 
   useEffect(() => {
     fetchCustomers();
-  }, [fetchCustomers]);
+    fetchCouriers();
+  }, [fetchCustomers, fetchCouriers]);
 
   const getCustomerInfo = (order: Order) => {
     const matched = customers.find(c => 
@@ -440,6 +443,38 @@ export default function AdminOrdersCardView() {
                     Area: <span className="text-black">{order.cityArea || 'N/A'}</span>
                   </div>
                 </div>
+
+                {/* Courier Logo & Name (Section 8 Requirement) */}
+                {(() => {
+                  const courierName = order.courier?.name || (couriers.find(c => c.status === 'active')?.name);
+                  const matched = couriers.find(c => 
+                    c.name.toLowerCase() === (courierName || '').toLowerCase() || 
+                    c.id === (order.courier as any)?.id
+                  ) || couriers.find(c => c.status === 'active');
+
+                  if (!courierName && !matched) return null;
+
+                  return (
+                    <div className="flex items-center justify-between gap-2 px-2.5 py-1 bg-white border border-gray-200 text-[10px]">
+                      <div className="flex items-center gap-1.5 font-bold text-gray-800">
+                        {matched?.logoUrl ? (
+                          <img 
+                            src={matched.logoUrl} 
+                            alt={matched.name || courierName} 
+                            className="w-3.5 h-3.5 object-contain"
+                            onError={(e: any) => { e.target.style.display = 'none'; }}
+                          />
+                        ) : (
+                          <Truck className="w-3.5 h-3.5 text-gray-500" />
+                        )}
+                        <span>{matched?.name || courierName}</span>
+                      </div>
+                      {order.courier?.trackingId && (
+                        <span className="font-mono text-gray-500 text-[10px]">#{order.courier.trackingId}</span>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 <div className="flex items-center gap-2">
                    <div className={`flex-1 px-4 py-2.5 text-[10px] font-black uppercase tracking-widest border text-center rounded-lg transition-all ${getStatusColor(order.status)}`}>

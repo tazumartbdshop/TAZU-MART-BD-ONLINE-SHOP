@@ -6,7 +6,8 @@ import { useOrderStore, Order } from '../../store/useOrderStore';
 import { useCustomerStore } from '../../store/useCustomerStore';
 import AdminOrdersCardView from './AdminOrdersCardView';
 import PremiumOrderAdd from './PremiumOrderAdd';
-import AdminFakeOrderControl from './AdminFakeOrderControl';
+import AdminFraudCheckerPage from './AdminFraudCheckerPage';
+import { useCourierStore } from '../../store/useCourierStore';
 import { InvoiceView } from '../../components/checkout/InvoiceView';
 import { getCompletedOrdersCount, LoyaltyBadge, VerifiedTick } from '../../lib/loyalty';
 import { toast } from 'react-hot-toast';
@@ -16,6 +17,7 @@ import { FraudCheckerBar } from '../../components/admin/FraudCheckerBar';
 function AdminOrderList() {
   const { orders, updateOrderStatus, markAsRead, deleteOrder, clearAllOrders } = useOrderStore();
   const { customers, fetchCustomers } = useCustomerStore();
+  const { couriers, fetchCouriers } = useCourierStore();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
@@ -27,7 +29,8 @@ function AdminOrderList() {
 
   useEffect(() => {
     fetchCustomers();
-  }, [fetchCustomers]);
+    fetchCouriers();
+  }, [fetchCustomers, fetchCouriers]);
 
   const filteredOrders = orders.filter(order => {
     const matchesTab = activeTab === 'All' || 
@@ -327,12 +330,35 @@ function AdminOrderList() {
                   </div>
 
                   <div className="flex items-center gap-2 ml-auto">
-                    {order.courier?.name && (
-                      <span className="bg-purple-50 text-purple-700 border border-purple-100 text-[10px] font-extrabold px-2 py-0.5 rounded flex items-center gap-1">
-                        <Truck className="w-3 h-3" />
-                        {order.courier.name} {order.courier.trackingId ? `· #${order.courier.trackingId}` : ''}
-                      </span>
-                    )}
+                    {/* Courier Name & Logo Badge (Section 8 Requirement) */}
+                    {(() => {
+                      const courierName = order.courier?.name || (couriers.find(c => c.status === 'active')?.name);
+                      const matched = couriers.find(c => 
+                        c.name.toLowerCase() === (courierName || '').toLowerCase() || 
+                        c.id === (order.courier as any)?.id
+                      ) || couriers.find(c => c.status === 'active');
+
+                      if (!courierName && !matched) return null;
+
+                      return (
+                        <span className="bg-gray-100 text-gray-800 border border-gray-300 text-[10px] font-bold px-2 py-0.5 rounded-none flex items-center gap-1.5">
+                          {matched?.logoUrl ? (
+                            <img 
+                              src={matched.logoUrl} 
+                              alt={matched.name || courierName} 
+                              className="w-3.5 h-3.5 object-contain"
+                              onError={(e: any) => { e.target.style.display = 'none'; }}
+                            />
+                          ) : (
+                            <Truck className="w-3 h-3 text-gray-500" />
+                          )}
+                          <span>{matched?.name || courierName}</span>
+                          {order.courier?.trackingId && (
+                            <span className="font-mono text-gray-500 font-normal">#{order.courier.trackingId}</span>
+                          )}
+                        </span>
+                      );
+                    })()}
 
                     {order.status === 'Completed' ? (
                       <span className="bg-purple-600 text-white font-extrabold text-[11px] px-2.5 py-1 rounded shadow-2xs flex items-center gap-1 uppercase tracking-wide">
@@ -586,7 +612,7 @@ export default function AdminOrders() {
       <Route path="/complete" element={<AdminOrderList />} />
       <Route path="/add" element={<PremiumOrderAdd />} />
       <Route path="/edit/:id" element={<PremiumOrderAdd />} />
-      <Route path="/fake-control" element={<AdminFakeOrderControl />} />
+      <Route path="/fraud-checker" element={<AdminFraudCheckerPage />} />
     </Routes>
   );
 }
