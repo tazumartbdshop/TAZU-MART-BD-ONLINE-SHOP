@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, useNavigate } from 'react-router-dom';
-import { Search, Plus, Trash2, MessageSquare, Loader2, Phone, MapPin, Calendar, Clock, ChevronRight, CheckCircle2, Truck, ShoppingBag } from 'lucide-react';
+import { Search, Plus, Trash2, MessageSquare, Loader2, Phone, MapPin, Calendar, Clock, ChevronRight, CheckCircle2, Truck, ShoppingBag, ShieldAlert } from 'lucide-react';
 import { formatPrice } from '../../lib/utils';
 import { useOrderStore, Order } from '../../store/useOrderStore';
 import { useCustomerStore } from '../../store/useCustomerStore';
@@ -11,6 +11,7 @@ import { InvoiceView } from '../../components/checkout/InvoiceView';
 import { getCompletedOrdersCount, LoyaltyBadge, VerifiedTick } from '../../lib/loyalty';
 import { toast } from 'react-hot-toast';
 import { DeleteOrderModal } from '../../components/admin/DeleteOrderModal';
+import { FraudCheckerBar } from '../../components/admin/FraudCheckerBar';
 
 function AdminOrderList() {
   const { orders, updateOrderStatus, markAsRead, deleteOrder, clearAllOrders } = useOrderStore();
@@ -22,6 +23,7 @@ function AdminOrderList() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [selectedInvoiceOrder, setSelectedInvoiceOrder] = useState<any>(null);
   const [orderToDelete, setOrderToDelete] = useState<Order | null>(null);
+  const [fraudCheckPhone, setFraudCheckPhone] = useState<string>('');
 
   useEffect(() => {
     fetchCustomers();
@@ -193,6 +195,12 @@ function AdminOrderList() {
         </div>
       </div>
 
+      {/* Fraud Checker Bar */}
+      <FraudCheckerBar 
+        selectedPhone={fraudCheckPhone} 
+        onClearExternalPhone={() => setFraudCheckPhone('')} 
+      />
+
       <div className="p-3 sm:p-4 space-y-3 flex-1 bg-gray-50/50">
         {filteredOrders.map((order, index) => {
           const isExpanded = expandedId === order.id;
@@ -272,10 +280,24 @@ function AdminOrderList() {
 
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-neutral-600">
                       {custInfo.phone && (
-                        <span className="flex items-center gap-1 font-bold text-neutral-800">
-                          <Phone className="w-3 h-3 text-neutral-400 shrink-0" />
-                          {custInfo.phone}
-                        </span>
+                        <div className="flex items-center gap-1">
+                          <span className="flex items-center gap-1 font-bold text-neutral-800">
+                            <Phone className="w-3 h-3 text-neutral-400 shrink-0" />
+                            {custInfo.phone}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setFraudCheckPhone(custInfo.phone);
+                              window.scrollTo({ top: 0, behavior: 'smooth' });
+                            }}
+                            title="Check Fraud with Steadfast Courier"
+                            className="text-neutral-400 hover:text-black p-0.5 ml-0.5 transition-colors"
+                          >
+                            <ShieldAlert className="w-3.5 h-3.5 text-amber-500 hover:scale-110 transition-transform" />
+                          </button>
+                        </div>
                       )}
                       <span className="text-neutral-300">•</span>
                       <span className="text-neutral-500 font-medium">
@@ -356,7 +378,23 @@ function AdminOrderList() {
                       </div>
                       <div>
                         <span className="text-gray-500 block text-xs">Mobile Number</span>
-                        <p className="font-bold text-black">{order.mobileNumber || 'No Information'}</p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <p className="font-bold text-black">{order.mobileNumber || 'No Information'}</p>
+                          {order.mobileNumber && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setFraudCheckPhone(order.mobileNumber);
+                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                              }}
+                              className="text-[10px] font-bold text-black bg-white border border-neutral-300 hover:bg-neutral-100 px-2 py-0.5 rounded-none flex items-center gap-1 transition-colors shadow-2xs"
+                              title="Check Fraud with Steadfast Courier"
+                            >
+                              <ShieldAlert className="w-3 h-3 text-amber-500" />
+                              <span>Check Fraud</span>
+                            </button>
+                          )}
+                        </div>
                       </div>
                       <div>
                         <span className="text-gray-500 block text-xs">Full Address</span>

@@ -25,7 +25,7 @@ const verifyAdminAccess = (moduleId) => {
       }
 
       const token = authHeader.split(' ')[1];
-      const decoded = jwt.verify(token, JWT_SECRET);
+      const decoded = jwt.verify(token, JWT_SECRET) as any;
       
       if (!decoded || !decoded.id) {
         return res.status(401).json({ error: 'Unauthorized: Invalid token' });
@@ -4385,6 +4385,292 @@ Please ask me your query or select a quick question template below!`;
       console.error("[Get Customers] Fatal Error:", err);
       return res.json({ customers: [] });
     }
+  });
+
+  // Helper to load Steadfast Courier credentials securely on server
+  async function getSteadfastCredentials(): Promise<{ apiKey: string; secretKey: string; apiUrl: string } | null> {
+    // 1. Check environment variables
+    if (process.env.STEADFAST_API_KEY && process.env.STEADFAST_SECRET_KEY) {
+      return {
+        apiKey: process.env.STEADFAST_API_KEY.trim(),
+        secretKey: process.env.STEADFAST_SECRET_KEY.trim(),
+        apiUrl: (process.env.STEADFAST_API_URL || 'https://portal.steadfast.com.bd/api/v1').trim()
+      };
+    }
+
+    // 2. Check Supabase 'settings' table where id = 'delivery'
+    try {
+      const clientToUse = supabaseServiceRole || supabaseAdmin;
+      if (clientToUse) {
+        const { data, error } = await clientToUse.from('settings').select('*').eq('id', 'delivery').limit(1);
+        if (!error && data && data.length > 0) {
+          let courierApis = data[0].courierApis;
+          if (typeof courierApis === 'string') {
+            try { courierApis = JSON.parse(courierApis); } catch(e) {}
+          }
+          if (Array.isArray(courierApis)) {
+            const steadfast = courierApis.find((c: any) => c.id === 'steadfast');
+            if (steadfast && steadfast.apiKey && steadfast.secretKey) {
+              return {
+                apiKey: String(steadfast.apiKey).trim(),
+                secretKey: String(steadfast.secretKey).trim(),
+                apiUrl: String(steadfast.apiUrl || 'https://portal.steadfast.com.bd/api/v1').trim()
+              };
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("[Steadfast Credentials] Supabase check warning:", err);
+    }
+
+    // 3. Check Firestore fallback
+    try {
+      const db = await getFirestoreDatabaseInstance();
+      const docRef = db.collection('settings').doc('delivery');
+      const snap = await docRef.get();
+      if (snap.exists) {
+        const docData = snap.data();
+        let courierApis = docData?.courierApis;
+        if (typeof courierApis === 'string') {
+          try { courierApis = JSON.parse(courierApis); } catch(e) {}
+        }
+        if (Array.isArray(courierApis)) {
+          const steadfast = courierApis.find((c: any) => c.id === 'steadfast');
+          if (steadfast && steadfast.apiKey && steadfast.secretKey) {
+            return {
+              apiKey: String(steadfast.apiKey).trim(),
+              secretKey: String(steadfast.secretKey).trim(),
+              apiUrl: String(steadfast.apiUrl || 'https://portal.steadfast.com.bd/api/v1').trim()
+            };
+          }
+        }
+      }
+    } catch (err) {
+      // non-blocking
+    }
+
+    return null;
+  }
+
+  // Validate and normalize Bangladeshi mobile numbers
+  function normalizeBDPhoneNumber(phone: string): { valid: boolean; normalized: string; error?: string } {
+    if (!phone || typeof phone !== 'string') {
+      return { valid: false, normalized: '', error: 'Mobile number is required.' };
+    }
+
+    let digits = phone.replace(/\D/g, '');
+
+    // Normalize Bangladeshi prefixes: +8801 / 8801 / 01
+    if (digits.startsWith('8801') && digits.length === 13) {
+      digits = digits.slice(2);
+    } else if (digits.startsWith('880') && digits.length === 14) {
+      digits = digits.slice(3);
+    }
+
+    if (digits.length !== 11) {
+      return {
+        valid: false,
+        normalized: digits,
+        error: `Invalid length (${digits.length} digits). A valid Bangladeshi mobile number must be 11 digits (e.g. 017XXXXXXXX).`
+      };
+    }
+
+    if (!/^01[3-9]\d{8}$/.test(digits)) {
+      return {
+        valid: false,
+        normalized: digits,
+        error: 'Invalid operator prefix. A valid Bangladeshi mobile number must start with 013-019.'
+      };
+    }
+
+    return { valid: true, normalized: digits };
+  }
+
+  // Handle Steadfast Courier fraud check request
+  async function executeFraudCheck(rawPhone: string, res: express.Response) {
+    try {
+      res.setHeader('Content-Type', 'application/json');
+
+      const phoneValidation = normalizeBDPhoneNumber(rawPhone);
+      if (!phoneValidation.valid) {
+        return res.status(400).json({
+          success: false,
+          error: phoneValidation.error || 'Invalid mobile number'
+        });
+      }
+
+      const normalizedPhone = phoneValidation.normalized;
+
+      const credentials = await getSteadfastCredentials();
+      if (!credentials || !credentials.apiKey || !credentials.secretKey) {
+        return res.status(200).json({
+          success: false,
+          configured: false,
+          error: "Steadfast Courier API is not configured. Please add your API Key and Secret Key in Courier Integration."
+        });
+      }
+
+      let baseUrl = (credentials.apiUrl || 'https://portal.steadfast.com.bd/api/v1').trim().replace(/\/+$/, '');
+      if (!baseUrl.includes('/api/v1')) {
+        baseUrl = `${baseUrl}/api/v1`;
+      }
+      const targetUrl = `${baseUrl}/fraud_check/${normalizedPhone}`;
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+      let apiResponse;
+      try {
+        apiResponse = await fetch(targetUrl, {
+          method: 'GET',
+          headers: {
+            'Api-Key': credentials.apiKey,
+            'Secret-Key': credentials.secretKey,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          signal: controller.signal
+        });
+      } catch (fetchErr: any) {
+        clearTimeout(timeoutId);
+        if (fetchErr.name === 'AbortError') {
+          return res.status(504).json({
+            success: false,
+            error: "Steadfast Courier API request timed out (10s limit). Please check your internet connection or try again."
+          });
+        }
+        return res.status(502).json({
+          success: false,
+          error: `Could not connect to Steadfast Courier API: ${fetchErr.message || 'Network error'}`
+        });
+      }
+      clearTimeout(timeoutId);
+
+      if (apiResponse.status === 401 || apiResponse.status === 403) {
+        return res.status(200).json({
+          success: false,
+          configured: true,
+          error: "Authentication failed with Steadfast Courier. Please check your API Key and Secret Key."
+        });
+      }
+
+      if (apiResponse.status === 404) {
+        return res.status(200).json({
+          success: true,
+          configured: true,
+          phone: normalizedPhone,
+          found: false,
+          message: "No delivery history found for this number in Steadfast Courier."
+        });
+      }
+
+      const responseJson: any = await apiResponse.json().catch(() => null);
+
+      if (!responseJson) {
+        return res.status(502).json({
+          success: false,
+          error: "Invalid JSON response received from Steadfast Courier API."
+        });
+      }
+
+      // Check for error or not found status within JSON response
+      if (responseJson.status === 404 || (responseJson.message && typeof responseJson.message === 'string' && responseJson.message.toLowerCase().includes('not found'))) {
+        return res.status(200).json({
+          success: true,
+          configured: true,
+          phone: normalizedPhone,
+          found: false,
+          message: responseJson.message || "No delivery history found for this number in Steadfast Courier."
+        });
+      }
+
+      if (responseJson.status && responseJson.status !== 200 && responseJson.message) {
+        return res.status(200).json({
+          success: false,
+          configured: true,
+          error: `Steadfast API Error: ${responseJson.message}`
+        });
+      }
+
+      const payload = responseJson.data || responseJson;
+
+      const totalParcelsRaw = payload.total_parcels ?? payload.Total_parcels ?? payload.total_orders ?? payload.total ?? null;
+      const totalDeliveredRaw = payload.total_delivered ?? payload.Total_delivered ?? payload.delivered ?? null;
+      const totalCancelledRaw = payload.total_cancelled ?? payload.Total_cancelled ?? payload.cancelled ?? payload.canceled ?? null;
+      const totalFraudReportsRaw = payload.total_fraud_reports ?? payload.Total_fraud_reports ?? payload.fraud_reports ?? null;
+
+      // If no valid parcel fields exist
+      if (totalParcelsRaw === null && totalDeliveredRaw === null && totalCancelledRaw === null) {
+        return res.status(200).json({
+          success: true,
+          configured: true,
+          phone: normalizedPhone,
+          found: false,
+          message: responseJson.message || "No delivery history found for this number in Steadfast Courier."
+        });
+      }
+
+      const totalParcels = Number(totalParcelsRaw || 0);
+      const totalDelivered = Number(totalDeliveredRaw || 0);
+      const totalCancelled = totalCancelledRaw !== null ? Number(totalCancelledRaw) : null;
+      const totalFraudReports = totalFraudReportsRaw !== null ? Number(totalFraudReportsRaw) : 0;
+
+      let successRate: number | null = null;
+      if (totalParcels > 0) {
+        successRate = Math.min(100, Math.max(0, Math.round((totalDelivered / totalParcels) * 100)));
+      }
+
+      return res.status(200).json({
+        success: true,
+        configured: true,
+        phone: normalizedPhone,
+        found: totalParcels > 0 || totalDelivered > 0 || (totalCancelled !== null && totalCancelled > 0),
+        data: {
+          totalParcels,
+          totalDelivered,
+          totalCancelled,
+          totalFraudReports,
+          deliverySuccessRate: successRate,
+          raw: {
+            total_parcels: totalParcelsRaw,
+            total_delivered: totalDeliveredRaw,
+            total_cancelled: totalCancelledRaw,
+            total_fraud_reports: totalFraudReportsRaw
+          }
+        }
+      });
+    } catch (err: any) {
+      console.error("[Fraud Check Execution Error]:", err);
+      return res.status(500).json({
+        success: false,
+        error: `Internal server error: ${err.message || 'Unknown error'}`
+      });
+    }
+  }
+
+  // Endpoints for Fraud Checker
+  app.get("/api/admin/fraud-check/status", async (req, res) => {
+    try {
+      res.setHeader('Content-Type', 'application/json');
+      const creds = await getSteadfastCredentials();
+      return res.json({
+        configured: !!(creds && creds.apiKey && creds.secretKey),
+        apiUrl: creds?.apiUrl || 'https://portal.steadfast.com.bd/api/v1'
+      });
+    } catch (err: any) {
+      return res.json({ configured: false, error: err.message });
+    }
+  });
+
+  app.get("/api/admin/fraud-check", async (req, res) => {
+    const phoneParam = (req.query.phone as string) || '';
+    return executeFraudCheck(phoneParam, res);
+  });
+
+  app.post("/api/admin/fraud-check", async (req, res) => {
+    const phoneParam = req.body?.phone || req.query?.phone || '';
+    return executeFraudCheck(phoneParam, res);
   });
 
   app.post("/api/admin/create-customer", async (req, res) => {

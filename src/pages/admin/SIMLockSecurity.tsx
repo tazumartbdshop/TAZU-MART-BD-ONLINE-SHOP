@@ -34,10 +34,10 @@ export default function SIMLockSecurity() {
         </div>
         <div className="flex gap-2">
           <button 
-            onClick={() => setUnlocked(false)}
+            onClick={() => window.location.reload()}
             className="px-6 py-2.5 bg-white border border-gray-200 text-gray-900 font-black uppercase tracking-widest text-[9px] hover:bg-gray-50 transition-all flex items-center gap-2"
           >
-            <Lock className="w-3.5 h-3.5" /> Re-Lock Section
+            <ShieldCheck className="w-3.5 h-3.5" /> Refresh Status
           </button>
         </div>
       </div>
