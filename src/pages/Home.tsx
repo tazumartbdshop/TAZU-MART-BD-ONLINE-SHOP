@@ -13,6 +13,7 @@ import { formatPrice } from '../lib/utils';
 import { CompactProductCard } from '../components/product/CompactProductCard';
 import CategoryBannerCarousel from '../components/home/CategoryBannerCarousel';
 import FlashSaleTimer from '../components/home/FlashSaleTimer';
+import FlashSaleCarousel from '../components/home/FlashSaleCarousel';
 import { CategorySection } from '../components/home/CategorySection';
 import { motion, AnimatePresence } from 'motion/react';
 import { preloadHomepageDataAndAssets } from '../utils/preloadHelper';
@@ -293,7 +294,8 @@ export default function Home() {
               </Link>
             </div>
           </div>
-          {renderProductGrid(flashSaleProducts.slice(0, 6))}
+          {/* Single Product Right-to-Left Auto-Sliding Carousel */}
+          <FlashSaleCarousel products={flashSaleProducts} />
         </section>
       )}
 

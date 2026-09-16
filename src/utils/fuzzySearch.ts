@@ -158,7 +158,7 @@ export function filterProductsSmart(products: Product[], queryStr: string): Prod
 
   // Direct exact keyword checks for special groups
   if (cleanQuery === 'flash_sale' || cleanQuery === 'flash sale' || cleanQuery === 'flash') {
-    return products.filter(p => p.is_flash_sale);
+    return products.filter(p => Boolean(p.is_flash_sale || (p as any).isFlashSale));
   }
   if (cleanQuery === 'trending' || cleanQuery === 'trending_item' || cleanQuery === 'trending item') {
     return products.filter(p => p.is_trending);

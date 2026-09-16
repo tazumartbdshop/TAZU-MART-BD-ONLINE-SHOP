@@ -49,8 +49,8 @@ export function CompactProductCard({ product, rank }: any) {
   
   const showRating = liveReviewsCount > 0;
   
-  const rewardCoins = product.reward_coins || 150;
-  const isCoinEnabled = product.coin_enabled !== false;
+  const rewardCoins = product.reward_coins;
+  const isCoinEnabled = product.coin_enabled !== false && typeof rewardCoins === 'number' && rewardCoins > 0;
 
   const basePrice = product.price || 0;
   const discountPercent = product.discountPrice 
@@ -117,10 +117,12 @@ export function CompactProductCard({ product, rank }: any) {
             referrerPolicy="no-referrer" 
           />
           
-          {/* Top Right Sold Count Badge - Flush Design */}
-          <span className="absolute top-0 right-0 bg-[#C40000] text-white text-[8px] font-extrabold px-1.5 py-0.5 rounded-bl-[4px] shadow-none flex items-center gap-0.5 select-none z-10">
-            🔥 {formatSoldCount(product.soldCount || 150)}
-          </span>
+          {/* Top Right Sold Count Badge - Flush Design (only if in database) */}
+          {(product.soldCount !== undefined && product.soldCount !== null && product.soldCount > 0) && (
+            <span className="absolute top-0 right-0 bg-[#C40000] text-white text-[8px] font-extrabold px-1.5 py-0.5 rounded-bl-[4px] shadow-none flex items-center gap-0.5 select-none z-10">
+              🔥 {formatSoldCount(product.soldCount)}
+            </span>
+          )}
 
           {/* Center Out of Stock Banner inside image */}
           {isOutOfStock && (
