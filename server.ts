@@ -5307,6 +5307,268 @@ Please ask me your query or select a quick question template below!`;
     return handleDynamicFraudCheck(courierId, phone, res);
   });
 
+  // Real Courier Send Parcel endpoint (Requirement 7 & 8)
+  app.post("/api/admin/couriers/send-parcel", async (req, res) => {
+    try {
+      res.setHeader('Content-Type', 'application/json');
+      const { courierId, orderId, customerName, customerPhone, fullAddress, codAmount, notes, city, area } = req.body || {};
+
+      // 1. Validations
+      if (!courierId) {
+        return res.status(400).json({ success: false, error: "Please select a courier." });
+      }
+      if (!customerName || !customerName.trim()) {
+        return res.status(400).json({ success: false, error: "Customer name is required." });
+      }
+      if (!customerPhone || !customerPhone.trim()) {
+        return res.status(400).json({ success: false, error: "Customer phone number is required." });
+      }
+      
+      const cleanPhone = customerPhone.replace(/\D/g, '');
+      const normalizedPhone = cleanPhone.startsWith('8801') ? cleanPhone.slice(2) : (cleanPhone.startsWith('880') ? cleanPhone.slice(3) : cleanPhone);
+      if (normalizedPhone.length !== 11 || !/^01[3-9]\d{8}$/.test(normalizedPhone)) {
+        return res.status(400).json({ success: false, error: "Valid 11-digit Bangladeshi mobile number (013-019) is required." });
+      }
+
+      if (!fullAddress || !fullAddress.trim()) {
+        return res.status(400).json({ success: false, error: "Full delivery address is required." });
+      }
+
+      const couriers = await loadCouriersList();
+      const courier = couriers.find(c => c.id === courierId);
+      if (!courier) {
+        return res.status(404).json({ success: false, error: "Selected courier not found in system." });
+      }
+
+      if (courier.status !== 'active') {
+        return res.status(400).json({ success: false, error: `${courier.name} is currently inactive. Please activate it in Courier Listing.` });
+      }
+
+      // Check credentials
+      if (courier.mappingType === 'steadfast' || courier.authType === 'api_key_secret') {
+        if (!courier.apiKey || !courier.secretKey) {
+          return res.status(400).json({ 
+            success: false, 
+            error: `${courier.name} API Key and Secret Key are not configured. Please add them in Courier Listing.` 
+          });
+        }
+      } else if (courier.authType === 'bearer_token') {
+        if (!courier.accessToken) {
+          return res.status(400).json({ 
+            success: false, 
+            error: `${courier.name} API Bearer Token is not configured. Please add it in Courier Listing.` 
+          });
+        }
+      }
+
+      const collectionAmount = Math.max(0, Number(codAmount) || 0);
+      const invoiceNumber = orderId ? String(orderId).replace(/^#/, '') : `ORD-${Date.now()}`;
+
+      // Dispatch to actual courier
+      if (courier.mappingType === 'steadfast' || courier.id === 'steadfast' || /steadfast/i.test(courier.name)) {
+        const targetUrl = `${courier.apiBaseUrl || 'https://portal.steadfast.com.bd/api/v1'}/create_order`;
+        const headers: Record<string, string> = {
+          'Api-Key': courier.apiKey || '',
+          'Secret-Key': courier.secretKey || '',
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        };
+
+        const payload = {
+          invoice: invoiceNumber,
+          recipient_name: customerName.trim(),
+          recipient_phone: normalizedPhone,
+          recipient_address: fullAddress.trim(),
+          cod_amount: collectionAmount,
+          note: notes || ''
+        };
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+        const response = await fetch(targetUrl, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(payload),
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
+        const rawText = await response.text();
+        let data: any = {};
+        try {
+          data = JSON.parse(rawText);
+        } catch (e) {
+          return res.status(502).json({
+            success: false,
+            error: `${courier.name} API returned non-JSON response (HTTP ${response.status}).`
+          });
+        }
+
+        if (response.status === 200 && (data.status === 200 || data.consignment)) {
+          const consignment = data.consignment || {};
+          const trackingId = consignment.tracking_code || String(consignment.consignment_id || invoiceNumber);
+          const consignmentId = String(consignment.consignment_id || '');
+          
+          return res.json({
+            success: true,
+            trackingId,
+            consignmentId,
+            status: consignment.status || 'Parcel Created',
+            courier: sanitizeCourierForClient(courier),
+            message: data.message || "Parcel successfully submitted to Steadfast Courier",
+            apiResponse: data
+          });
+        } else {
+          const errDetail = data.errors ? (typeof data.errors === 'object' ? Object.values(data.errors).flat().join(', ') : String(data.errors)) : '';
+          const errMsg = data.message || errDetail || `Steadfast API returned HTTP ${response.status}`;
+          return res.status(400).json({
+            success: false,
+            error: errMsg,
+            apiResponse: data
+          });
+        }
+      } else if (courier.mappingType === 'pathao' || courier.id === 'pathao' || /pathao/i.test(courier.name)) {
+        const baseUrl = (courier.apiBaseUrl || 'https://api-hermes.pathao.com/aladdin/api/v1').replace(/\/$/, '');
+        const targetUrl = `${baseUrl}/orders`;
+        const headers: Record<string, string> = {
+          'Authorization': `Bearer ${courier.accessToken}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        };
+
+        const payload = {
+          store_id: Number(courier.storeId || 1),
+          merchant_order_id: invoiceNumber,
+          recipient_name: customerName.trim(),
+          recipient_phone: normalizedPhone,
+          recipient_address: fullAddress.trim(),
+          recipient_city: city || 'Dhaka',
+          recipient_zone: area || '',
+          amount_to_collect: collectionAmount,
+          item_type: 2,
+          item_quantity: 1,
+          item_weight: 0.5,
+          item_description: notes || 'Product delivery'
+        };
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+        const response = await fetch(targetUrl, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(payload),
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
+        const rawText = await response.text();
+        let data: any = {};
+        try {
+          data = JSON.parse(rawText);
+        } catch (e) {
+          return res.status(502).json({
+            success: false,
+            error: `${courier.name} API returned non-JSON response (HTTP ${response.status}).`
+          });
+        }
+
+        if (response.ok && (data.type === 'success' || data.data)) {
+          const parcelData = data.data || {};
+          const trackingId = parcelData.consignment_id || parcelData.tracking_id || invoiceNumber;
+          return res.json({
+            success: true,
+            trackingId,
+            consignmentId: String(parcelData.consignment_id || ''),
+            status: 'Parcel Created',
+            courier: sanitizeCourierForClient(courier),
+            message: data.message || "Parcel successfully submitted to Pathao Courier",
+            apiResponse: data
+          });
+        } else {
+          return res.status(400).json({
+            success: false,
+            error: data.message || (data.errors ? JSON.stringify(data.errors) : `Pathao API returned HTTP ${response.status}`),
+            apiResponse: data
+          });
+        }
+      } else if (courier.mappingType === 'redx' || courier.id === 'redx' || /redx/i.test(courier.name)) {
+        const baseUrl = (courier.apiBaseUrl || 'https://openapi.redx.com.bd/v1.0.0-beta').replace(/\/$/, '');
+        const targetUrl = `${baseUrl}/parcels`;
+        const headers: Record<string, string> = {
+          'API-ACCESS-TOKEN': `Bearer ${courier.accessToken}`,
+          'Authorization': `Bearer ${courier.accessToken}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        };
+
+        const payload = {
+          customer_name: customerName.trim(),
+          customer_phone: normalizedPhone,
+          delivery_area: fullAddress.trim(),
+          cash_collection_amount: collectionAmount,
+          merchant_invoice_id: invoiceNumber,
+          value: collectionAmount,
+          parcel_weight: 500,
+          instruction: notes || ''
+        };
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+        const response = await fetch(targetUrl, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(payload),
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
+        const rawText = await response.text();
+        let data: any = {};
+        try {
+          data = JSON.parse(rawText);
+        } catch (e) {
+          return res.status(502).json({
+            success: false,
+            error: `${courier.name} API returned non-JSON response (HTTP ${response.status}).`
+          });
+        }
+
+        if (response.ok && (data.tracking_id || data.parcel_id)) {
+          const trackingId = data.tracking_id || data.parcel_id;
+          return res.json({
+            success: true,
+            trackingId,
+            consignmentId: String(data.parcel_id || trackingId),
+            status: 'Parcel Created',
+            courier: sanitizeCourierForClient(courier),
+            message: "Parcel successfully submitted to RedX Courier",
+            apiResponse: data
+          });
+        } else {
+          return res.status(400).json({
+            success: false,
+            error: data.message || `RedX API returned HTTP ${response.status}`,
+            apiResponse: data
+          });
+        }
+      } else {
+        return res.status(400).json({
+          success: false,
+          error: `Automated parcel submission for "${courier.name}" requires a supported parcel endpoint. Please use Steadfast, Pathao, or RedX integration.`
+        });
+      }
+    } catch (err: any) {
+      console.error("[Send Parcel Error]:", err);
+      return res.status(500).json({
+        success: false,
+        error: `Unable to submit parcel: ${err.message || 'Network error'}`
+      });
+    }
+  });
+
 
   app.post("/api/admin/create-customer", async (req, res) => {
     try {

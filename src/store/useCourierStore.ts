@@ -78,6 +78,26 @@ interface CourierStore {
   toggleCourierStatus: (id: string) => Promise<boolean>;
   testConnection: (id: string) => Promise<{ success: boolean; message: string; latencyMs?: number; error?: string }>;
   executeFraudCheck: (phone: string, courierId?: string) => Promise<FraudCheckResponse>;
+  sendParcel: (payload: {
+    courierId: string;
+    orderId: string;
+    customerName: string;
+    customerPhone: string;
+    fullAddress: string;
+    codAmount: number;
+    notes?: string;
+    city?: string;
+    area?: string;
+  }) => Promise<{
+    success: boolean;
+    trackingId?: string;
+    consignmentId?: string;
+    status?: string;
+    courier?: CourierItem;
+    message?: string;
+    error?: string;
+    apiResponse?: any;
+  }>;
 }
 
 export const useCourierStore = create<CourierStore>((set, get) => ({
@@ -209,6 +229,23 @@ export const useCourierStore = create<CourierStore>((set, get) => ({
       return {
         success: false,
         error: `Unable to fetch courier data. Please check courier API connection (${err.message || 'Network error'}).`
+      };
+    }
+  },
+
+  sendParcel: async (payload) => {
+    try {
+      const res = await fetch('/api/admin/couriers/send-parcel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      return data;
+    } catch (err: any) {
+      return {
+        success: false,
+        error: err.message || 'Network error occurred while submitting parcel'
       };
     }
   }

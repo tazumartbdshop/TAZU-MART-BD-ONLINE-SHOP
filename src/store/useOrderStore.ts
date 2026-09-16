@@ -70,9 +70,14 @@ export interface Order {
   storeName?: string;
   refundInfo?: Refund;
   courier?: {
+    id?: string;
     name: string;
+    logoUrl?: string;
     trackingId?: string;
     status?: string;
+    consignmentId?: string;
+    submittedAt?: string;
+    apiResponse?: any;
   };
   utmParams?: {
     utm_source?: string;

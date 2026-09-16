@@ -28,11 +28,17 @@ import {
   History,
   Truck,
   CreditCard,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Loader2,
+  ShieldAlert,
+  ShieldCheck,
+  RefreshCw,
+  ExternalLink
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { useOrderStore, OrderItem, Order } from '../../store/useOrderStore';
 import { useProductStore } from '../../store/useProductStore';
-import { useDeliveryStore } from '../../store/useDeliveryStore';
+import { useCourierStore, CourierItem, FraudCheckResponse } from '../../store/useCourierStore';
 import { useCustomerStore } from '../../store/useCustomerStore';
 import { formatPrice } from '../../lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -49,14 +55,15 @@ export default function PremiumOrderAdd({ editId, isModal, onClose }: PremiumOrd
   const id = editId || paramId;
   const { addOrder, orders, updateOrder } = useOrderStore();
   const { products } = useProductStore();
-  const { courierApis } = useDeliveryStore();
+  const { couriers, fetchCouriers, executeFraudCheck, sendParcel, testConnection } = useCourierStore();
   const { customers, fetchCustomers } = useCustomerStore();
 
   useEffect(() => {
     fetchCustomers();
-  }, [fetchCustomers]);
+    fetchCouriers();
+  }, [fetchCustomers, fetchCouriers]);
 
-  const activeCouriers = useMemo(() => courierApis.filter(api => api.status === 'active'), [courierApis]);
+  const activeCouriers = useMemo(() => couriers.filter(c => c.status === 'active'), [couriers]);
 
   const editingOrder = useMemo(() => orders.find(o => o.id === id), [orders, id]);
 
@@ -81,11 +88,27 @@ export default function PremiumOrderAdd({ editId, isModal, onClose }: PremiumOrd
   const [discount, setDiscount] = useState<{ type: 'percent' | 'fixed', value: number }>({ type: 'fixed', value: 0 });
   const [taxPercent, setTaxPercent] = useState(0);
   const [deliveryZone, setDeliveryZone] = useState('Inside Dhaka');
-  const [courier, setCourier] = useState('Steadfast');
+
+  // Dynamic Courier State
+  const [selectedCourierId, setSelectedCourierId] = useState<string>('');
+  const [courier, setCourier] = useState('');
   const [courierTrackingId, setCourierTrackingId] = useState('');
+  const [courierConsignmentId, setCourierConsignmentId] = useState('');
   const [courierStatus, setCourierStatus] = useState('');
+  const [courierSubmittedAt, setCourierSubmittedAt] = useState('');
+  const [courierApiResponse, setCourierApiResponse] = useState<any>(null);
+  const [isSendingParcel, setIsSendingParcel] = useState(false);
+  const [parcelError, setParcelError] = useState<string | null>(null);
+  const [isTestingCourier, setIsTestingCourier] = useState(false);
+
+  // Dynamic Fraud Checker State in Customer Information
+  const [showFraudChecker, setShowFraudChecker] = useState(false);
+  const [fraudCourierId, setFraudCourierId] = useState<string>('');
+  const [fraudChecking, setFraudChecking] = useState(false);
+  const [fraudResult, setFraudResult] = useState<FraudCheckResponse | null>(null);
+  const [fraudError, setFraudError] = useState<string | null>(null);
   const [notes, setNotes] = useState('');
-  
+
   // Pre-fill if editing
   useEffect(() => {
     if (editingOrder) {
@@ -109,13 +132,55 @@ export default function PremiumOrderAdd({ editId, isModal, onClose }: PremiumOrd
       });
       setTaxPercent(editingOrder.tax.percent);
       setNotes(editingOrder.notes || '');
-      setCourier(editingOrder.courier?.name || 'Steadfast');
+      setCourier(editingOrder.courier?.name || '');
       setCourierTrackingId(editingOrder.courier?.trackingId || '');
+      setCourierConsignmentId(editingOrder.courier?.consignmentId || '');
       setCourierStatus(editingOrder.courier?.status || '');
+      setCourierSubmittedAt(editingOrder.courier?.submittedAt || '');
+      setCourierApiResponse(editingOrder.courier?.apiResponse || null);
+      if (editingOrder.courier?.id) {
+        setSelectedCourierId(editingOrder.courier.id);
+      }
       setCustomerImage(editingOrder.customerImage);
       setSelectedUserId(editingOrder.userId);
     }
   }, [editingOrder]);
+
+  // Set default selected courier when active couriers load
+  useEffect(() => {
+    if (activeCouriers.length > 0 && !selectedCourierId) {
+      if (editingOrder?.courier?.id) {
+        const match = activeCouriers.find(c => c.id === editingOrder.courier?.id);
+        if (match) {
+          setSelectedCourierId(match.id);
+          setCourier(match.name);
+          return;
+        }
+      }
+      if (editingOrder?.courier?.name) {
+        const match = activeCouriers.find(c => c.name.toLowerCase() === editingOrder.courier?.name.toLowerCase());
+        if (match) {
+          setSelectedCourierId(match.id);
+          setCourier(match.name);
+          return;
+        }
+      }
+      // default to first active courier
+      setSelectedCourierId(activeCouriers[0].id);
+      setCourier(activeCouriers[0].name);
+    }
+  }, [activeCouriers, selectedCourierId, editingOrder]);
+
+  // Keep fraud courier selection synced
+  useEffect(() => {
+    if (selectedCourierId && !fraudCourierId) {
+      setFraudCourierId(selectedCourierId);
+    }
+  }, [selectedCourierId, fraudCourierId]);
+
+  const selectedCourierItem = useMemo(() => {
+    return couriers.find(c => c.id === selectedCourierId) || activeCouriers[0];
+  }, [couriers, selectedCourierId, activeCouriers]);
 
   const filteredCustomers = useMemo(() => {
     if (!customerSearch) return [];
@@ -242,9 +307,14 @@ export default function PremiumOrderAdd({ editId, isModal, onClose }: PremiumOrd
       notes,
       userId: selectedUserId,
       courier: { 
-        name: courier, 
+        id: selectedCourierItem?.id,
+        name: selectedCourierItem?.name || courier, 
+        logoUrl: selectedCourierItem?.logoUrl,
         trackingId: courierTrackingId,
-        status: courierStatus || (courierTrackingId ? 'Parcel Created' : 'Pending')
+        consignmentId: courierConsignmentId,
+        status: courierStatus || (courierTrackingId ? 'Parcel Created' : 'Pending'),
+        submittedAt: courierSubmittedAt || (courierTrackingId ? new Date().toISOString() : undefined),
+        apiResponse: courierApiResponse
       }
     };
 
@@ -257,6 +327,143 @@ export default function PremiumOrderAdd({ editId, isModal, onClose }: PremiumOrd
       onClose();
     } else {
       navigate('/admin/orders');
+    }
+  };
+
+  // Fraud Checker action in Customer Information
+  const handleRunFraudCheck = async (overridePhone?: string, overrideCourierId?: string) => {
+    const rawPhone = overridePhone || customer.phone;
+    if (!rawPhone || !rawPhone.trim()) {
+      setFraudError("Please enter customer mobile number first.");
+      return;
+    }
+
+    const cleanPhone = rawPhone.replace(/\D/g, '');
+    const normalized = cleanPhone.startsWith('8801') ? cleanPhone.slice(2) : (cleanPhone.startsWith('880') ? cleanPhone.slice(3) : cleanPhone);
+    if (normalized.length !== 11 || !/^01[3-9]\d{8}$/.test(normalized)) {
+      setFraudError("Valid 11-digit Bangladeshi mobile number (013-019) required.");
+      return;
+    }
+
+    setFraudError(null);
+    setFraudChecking(true);
+
+    try {
+      const courierToUse = overrideCourierId || fraudCourierId || selectedCourierId;
+      const res = await executeFraudCheck(normalized, courierToUse);
+      setFraudResult(res);
+    } catch (err: any) {
+      setFraudResult({
+        success: false,
+        error: "Unable to fetch courier data. Please check courier API connection."
+      });
+    } finally {
+      setFraudChecking(false);
+    }
+  };
+
+  // Real Courier Send Parcel action
+  const handleSendParcel = async () => {
+    setParcelError(null);
+
+    // 1. Validation
+    if (!selectedCourierItem) {
+      setParcelError("No active courier selected. Please configure and activate a courier in Courier Listing.");
+      toast.error("No active courier selected");
+      return;
+    }
+
+    if (!customer.name || !customer.name.trim()) {
+      setParcelError("Customer Name is required to send parcel.");
+      toast.error("Customer Name is required");
+      return;
+    }
+
+    if (!customer.phone || !customer.phone.trim()) {
+      setParcelError("Customer Mobile Number is required to send parcel.");
+      toast.error("Customer Mobile Number is required");
+      return;
+    }
+
+    const cleanPhone = customer.phone.replace(/\D/g, '');
+    const normalizedPhone = cleanPhone.startsWith('8801') ? cleanPhone.slice(2) : (cleanPhone.startsWith('880') ? cleanPhone.slice(3) : cleanPhone);
+    if (normalizedPhone.length !== 11 || !/^01[3-9]\d{8}$/.test(normalizedPhone)) {
+      setParcelError("Valid 11-digit Bangladeshi mobile number (013-019) is required.");
+      toast.error("Invalid mobile number");
+      return;
+    }
+
+    if (!customer.address || !customer.address.trim()) {
+      setParcelError("Full Delivery Address is required to send parcel.");
+      toast.error("Delivery Address is required");
+      return;
+    }
+
+    // 2. API Configuration check
+    if (selectedCourierItem.mappingType === 'steadfast' || selectedCourierItem.authType === 'api_key_secret') {
+      if (!selectedCourierItem.hasApiKey || !selectedCourierItem.hasSecretKey) {
+        setParcelError(`${selectedCourierItem.name} API Key and Secret Key are missing. Please configure them in Courier Listing.`);
+        toast.error("Courier API credentials missing");
+        return;
+      }
+    } else if (selectedCourierItem.authType === 'bearer_token') {
+      if (!selectedCourierItem.hasAccessToken) {
+        setParcelError(`${selectedCourierItem.name} API Bearer Token is missing. Please configure it in Courier Listing.`);
+        toast.error("Courier API token missing");
+        return;
+      }
+    }
+
+    setIsSendingParcel(true);
+
+    try {
+      const orderIdentifier = id ? (editingOrder?.orderId || id) : `ORD-${previewOrderNum}`;
+      const res = await sendParcel({
+        courierId: selectedCourierItem.id,
+        orderId: orderIdentifier,
+        customerName: customer.name.trim(),
+        customerPhone: normalizedPhone,
+        fullAddress: customer.address.trim(),
+        codAmount: Math.max(0, dueAmount),
+        notes: notes || '',
+        city: customer.city || '',
+        area: customer.area || ''
+      });
+
+      if (res.success && res.trackingId) {
+        setCourier(selectedCourierItem.name);
+        setCourierTrackingId(res.trackingId);
+        setCourierConsignmentId(res.consignmentId || '');
+        setCourierStatus(res.status || 'Parcel Created');
+        setCourierSubmittedAt(new Date().toISOString());
+        setCourierApiResponse(res.apiResponse);
+
+        if (id) {
+          updateOrder(id, {
+            courier: {
+              id: selectedCourierItem.id,
+              name: selectedCourierItem.name,
+              logoUrl: selectedCourierItem.logoUrl,
+              trackingId: res.trackingId,
+              consignmentId: res.consignmentId,
+              status: res.status || 'Parcel Created',
+              submittedAt: new Date().toISOString(),
+              apiResponse: res.apiResponse
+            }
+          });
+        }
+        toast.success(`Parcel submitted to ${selectedCourierItem.name}! Tracking ID: ${res.trackingId}`);
+      } else {
+        const errorMsg = res.error || "Failed to submit parcel to courier API.";
+        setParcelError(errorMsg);
+        toast.error(errorMsg);
+      }
+    } catch (err: any) {
+      const errorMsg = err.message || "Network error occurred while submitting parcel.";
+      setParcelError(errorMsg);
+      toast.error(errorMsg);
+    } finally {
+      setIsSendingParcel(false);
     }
   };
 
@@ -713,14 +920,197 @@ export default function PremiumOrderAdd({ editId, isModal, onClose }: PremiumOrd
                       className="w-full h-11 bg-gray-50 border border-gray-100 px-4 text-xs font-bold rounded-lg focus:outline-none focus:bg-white focus:border-black transition-all" 
                     />
                   </div>
-                  <div className="flex items-center justify-between gap-3 bg-gray-50 p-2.5 rounded-xl border border-gray-100">
-                     <span className="text-[10px] font-bold text-gray-500 uppercase flex items-center gap-2">
-                        <SearchCheck className="w-3.5 h-3.5 text-purple-600" />
-                        Validity Check
-                     </span>
-                     <button className="h-9 px-3 bg-black text-white text-[10px] font-black uppercase rounded-lg shadow-sm">
-                        Verify
-                     </button>
+                  {/* Dynamic Fraud Checker Integration in Customer Information */}
+                  <div className="border border-purple-200 bg-purple-50/40 rounded-xl overflow-hidden">
+                    <div className="flex items-center justify-between gap-3 p-2.5">
+                       <span className="text-[11px] font-bold text-gray-800 uppercase flex items-center gap-2">
+                          <ShieldAlert className="w-4 h-4 text-purple-600" />
+                          Fraud Checker
+                       </span>
+                       <button 
+                          type="button"
+                          onClick={() => {
+                            const nextState = !showFraudChecker;
+                            setShowFraudChecker(nextState);
+                            if (nextState && customer.phone && !fraudResult) {
+                              handleRunFraudCheck();
+                            }
+                          }}
+                          className="h-8 px-3 bg-black text-white text-[10px] font-black uppercase rounded-lg shadow-sm hover:bg-gray-800 transition-all flex items-center gap-1.5 cursor-pointer"
+                       >
+                          <SearchCheck className="w-3.5 h-3.5 text-purple-300" />
+                          {showFraudChecker ? 'Close Checker' : 'Verify'}
+                       </button>
+                    </div>
+
+                    {/* Inline Fraud Checker Panel */}
+                    {showFraudChecker && (
+                      <div className="p-3 bg-white border-t border-purple-100 space-y-3">
+                        {/* Courier Selector & Phone Input */}
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                          {/* Courier Selector */}
+                          <div className="flex items-center gap-1.5 border border-gray-200 bg-gray-50 px-2 py-1.5 rounded-lg shrink-0">
+                            <div className="w-5 h-5 bg-white border border-gray-200 rounded flex items-center justify-center overflow-hidden shrink-0">
+                              {activeCouriers.find(c => c.id === fraudCourierId)?.logoUrl ? (
+                                <img
+                                  src={activeCouriers.find(c => c.id === fraudCourierId)?.logoUrl}
+                                  alt="Courier"
+                                  className="w-full h-full object-contain"
+                                  onError={(e: any) => { e.target.style.display = 'none'; }}
+                                />
+                              ) : (
+                                <Truck className="w-3 h-3 text-gray-400" />
+                              )}
+                            </div>
+                            <select
+                              value={fraudCourierId}
+                              onChange={(e) => {
+                                const newCid = e.target.value;
+                                setFraudCourierId(newCid);
+                                if (customer.phone) {
+                                  handleRunFraudCheck(customer.phone, newCid);
+                                }
+                              }}
+                              className="bg-transparent text-xs font-bold text-gray-900 outline-none cursor-pointer"
+                            >
+                              {activeCouriers.length === 0 ? (
+                                <option value="">No Active Courier Configured</option>
+                              ) : (
+                                activeCouriers.map((c) => (
+                                  <option key={c.id} value={c.id}>
+                                    {c.name}
+                                  </option>
+                                ))
+                              )}
+                            </select>
+                          </div>
+
+                          {/* Check Fraud Button */}
+                          <button
+                            type="button"
+                            disabled={fraudChecking}
+                            onClick={() => handleRunFraudCheck()}
+                            className="flex-1 sm:flex-none h-8 px-4 bg-gray-900 hover:bg-black text-white text-xs font-bold uppercase rounded-lg flex items-center justify-center gap-1.5 transition-colors disabled:opacity-60 cursor-pointer"
+                          >
+                            {fraudChecking ? (
+                              <>
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                <span>Checking...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Search className="w-3.5 h-3.5" />
+                                <span>Check Fraud</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+
+                        {fraudError && (
+                          <div className="p-2 bg-red-50 border border-red-200 rounded text-xs text-red-600 flex items-center gap-1.5">
+                            <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                            <span>{fraudError}</span>
+                          </div>
+                        )}
+
+                        {/* Fraud Results Display */}
+                        {fraudResult && (
+                          <div className="space-y-2.5 pt-2 border-t border-gray-100">
+                            {/* Summary Header */}
+                            <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-gray-500 font-medium">Customer:</span>
+                                <span className="font-bold font-mono text-gray-900">
+                                  {fraudResult.phone || customer.phone}
+                                </span>
+                                {fraudResult.courier && (
+                                  <span className="text-gray-500 text-[11px] ml-1">
+                                    via <strong className="text-gray-800">{fraudResult.courier.name}</strong>
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-[10px] font-bold font-mono px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 uppercase">
+                                Real Courier Data
+                              </span>
+                            </div>
+
+                            {/* Unconfigured / Error States */}
+                            {fraudResult.configured === false && (
+                              <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 flex items-center gap-2">
+                                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                                <span>{fraudResult.error || "Courier API credentials are not configured in Courier Listing."}</span>
+                              </div>
+                            )}
+
+                            {fraudResult.success === false && fraudResult.configured !== false && (
+                              <div className="p-2.5 bg-red-50 border border-red-200 rounded-lg text-xs text-red-800 flex items-center gap-2">
+                                <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" />
+                                <span>{fraudResult.error || "Unable to fetch courier data. Please check courier API connection."}</span>
+                              </div>
+                            )}
+
+                            {/* Real Metrics Grid */}
+                            {fraudResult.success && fraudResult.stats && (
+                              <div className="space-y-2.5">
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
+                                  <div className="bg-gray-50 border border-gray-200 p-2 rounded-lg">
+                                    <div className="text-[10px] uppercase font-bold text-gray-500">Total Parcels</div>
+                                    <div className="text-sm sm:text-base font-black text-gray-900">{fraudResult.stats.totalParcels}</div>
+                                  </div>
+                                  <div className="bg-emerald-50 border border-emerald-200 p-2 rounded-lg">
+                                    <div className="text-[10px] uppercase font-bold text-emerald-700">Delivered</div>
+                                    <div className="text-sm sm:text-base font-black text-emerald-800">{fraudResult.stats.totalDelivered}</div>
+                                  </div>
+                                  <div className="bg-red-50 border border-red-200 p-2 rounded-lg">
+                                    <div className="text-[10px] uppercase font-bold text-red-700">Returned</div>
+                                    <div className="text-sm sm:text-base font-black text-red-800">{fraudResult.stats.totalReturned}</div>
+                                  </div>
+                                  <div className="bg-purple-50 border border-purple-200 p-2 rounded-lg">
+                                    <div className="text-[10px] uppercase font-bold text-purple-700">Success Rate</div>
+                                    <div className="text-sm sm:text-base font-black text-purple-800">
+                                      {fraudResult.stats.deliverySuccessRate !== undefined ? `${fraudResult.stats.deliverySuccessRate}%` : 'N/A'}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Parcels List if available */}
+                                {fraudResult.stats.parcels && fraudResult.stats.parcels.length > 0 && (
+                                  <div className="border border-gray-200 rounded-lg overflow-hidden text-xs">
+                                    <div className="bg-gray-50 px-3 py-1.5 font-bold text-gray-700 border-b border-gray-200 flex justify-between">
+                                      <span>Recent Parcels ({fraudResult.stats.parcels.length})</span>
+                                      <span className="text-[11px] text-gray-500">Status</span>
+                                    </div>
+                                    <div className="max-h-36 overflow-y-auto divide-y divide-gray-100 bg-white">
+                                      {fraudResult.stats.parcels.slice(0, 5).map((p, idx) => (
+                                        <div key={idx} className="p-2 flex items-center justify-between text-[11px]">
+                                          <div>
+                                            <span className="font-mono font-bold text-gray-800">{p.consignmentId || p.trackingCode || `Parcel #${idx+1}`}</span>
+                                            {p.orderDate && <span className="text-gray-400 ml-2">{p.orderDate}</span>}
+                                          </div>
+                                          <span className={`px-1.5 py-0.5 rounded font-bold ${
+                                            p.status?.toLowerCase().includes('deliver') ? 'bg-emerald-100 text-emerald-800' :
+                                            p.status?.toLowerCase().includes('return') ? 'bg-red-100 text-red-800' :
+                                            'bg-gray-100 text-gray-700'
+                                          }`}>
+                                            {p.status || 'Unknown'}
+                                          </span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {fraudResult.stats.totalParcels === 0 && (
+                                  <div className="p-2.5 bg-gray-50 border border-gray-200 rounded text-center text-xs text-gray-500">
+                                    No previous courier parcel history found for this phone number.
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                </div>
             </div>
@@ -782,88 +1172,178 @@ export default function PremiumOrderAdd({ editId, isModal, onClose }: PremiumOrd
               </div>
            </div>
 
-           {/* Courier & Tracking */}
-           <div className="space-y-4">
-             {activeCouriers.map((api) => (
-               <div key={api.id} className="bg-white border border-[#eee] p-4 md:p-6 rounded-[14px] shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-[14px] font-bold text-gray-900">{api.name}</h3>
-                    <span className="text-[10px] font-bold text-green-500 flex items-center gap-1.5">
-                       <div className="w-2 h-2 rounded-full bg-green-500" />
-                       ONLINE
-                    </span>
+           {/* Courier & Tracking Section */}
+           <div className="bg-white border border-[#eee] p-4 md:p-6 rounded-[14px] shadow-[0_2px_8px_rgba(0,0,0,0.04)] space-y-4">
+              {/* Heading & Verified Connection Status */}
+              <div className="flex items-center justify-between">
+                <h3 className="text-[14px] font-bold text-gray-900 tracking-wider uppercase flex items-center gap-2">
+                  <Truck className="w-4 h-4 text-gray-800" />
+                  COURIER
+                </h3>
+                {selectedCourierItem && (
+                  <div className="flex items-center gap-2">
+                    {selectedCourierItem.lastTestStatus === 'connected' ? (
+                      <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-1.5 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                        ONLINE
+                      </span>
+                    ) : selectedCourierItem.lastTestStatus === 'failed' ? (
+                      <span className="text-[10px] font-bold text-red-600 flex items-center gap-1.5 bg-red-50 px-2 py-0.5 rounded border border-red-200">
+                        <span className="w-2 h-2 rounded-full bg-red-500" />
+                        OFFLINE
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-bold text-gray-500 flex items-center gap-1.5 bg-gray-100 px-2 py-0.5 rounded border border-gray-200">
+                        <span className="w-2 h-2 rounded-full bg-gray-400" />
+                        UNTESTED
+                      </span>
+                    )}
+
+                    <button
+                      type="button"
+                      disabled={isTestingCourier}
+                      onClick={async () => {
+                        if (!selectedCourierItem) return;
+                        setIsTestingCourier(true);
+                        const testRes = await testConnection(selectedCourierItem.id);
+                        setIsTestingCourier(false);
+                        if (testRes.success) {
+                          toast.success(`${selectedCourierItem.name} connection test succeeded! (${testRes.latencyMs || 0}ms)`);
+                        } else {
+                          toast.error(`${selectedCourierItem.name} connection test failed: ${testRes.message || testRes.error}`);
+                        }
+                      }}
+                      className="text-[10px] font-semibold text-gray-500 hover:text-black underline flex items-center gap-1 cursor-pointer"
+                      title="Test live API connection"
+                    >
+                      {isTestingCourier ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                      Test
+                    </button>
                   </div>
-                  
-                  <div className="space-y-4">
-                     <div className="relative">
+                )}
+              </div>
+
+              {/* Courier Selection Box or No Active Courier Message */}
+              {activeCouriers.length === 0 ? (
+                <div className="p-4 bg-gray-50 border border-dashed border-gray-300 rounded-xl text-center space-y-1">
+                  <Truck className="w-7 h-7 text-gray-400 mx-auto mb-1" />
+                  <p className="text-xs font-bold text-gray-700">No active courier configured</p>
+                  <p className="text-[10px] text-gray-500">
+                    Please go to Admin → Courier → Courier Listing to add and activate couriers.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {/* Dynamic Courier Selection Box */}
+                  <div className="relative">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">
+                      Select Courier
+                    </label>
+                    <div className="flex items-center gap-2.5 border border-gray-200 bg-gray-50 p-2.5 rounded-[10px]">
+                      {/* Courier Logo */}
+                      <div className="w-8 h-8 bg-white border border-gray-200 rounded-lg flex items-center justify-center overflow-hidden shrink-0">
+                        {selectedCourierItem?.logoUrl ? (
+                          <img 
+                            src={selectedCourierItem.logoUrl} 
+                            alt={selectedCourierItem.name} 
+                            className="w-full h-full object-contain p-0.5" 
+                            onError={(e: any) => { e.target.style.display = 'none'; }}
+                          />
+                        ) : (
+                          <Truck className="w-4 h-4 text-gray-400" />
+                        )}
+                      </div>
+
+                      {/* Dropdown with only active couriers */}
+                      <div className="flex-1 relative">
                         <select 
-                           value={courier === api.name ? courier : api.name}
-                           onChange={(e) => setCourier(e.target.value)}
-                           className="w-full h-[52px] bg-gray-50 border border-gray-100 px-4 text-[14px] font-semibold rounded-[10px] outline-none appearance-none cursor-pointer"
+                          value={selectedCourierId}
+                          onChange={(e) => {
+                            const newId = e.target.value;
+                            setSelectedCourierId(newId);
+                            const found = activeCouriers.find(c => c.id === newId);
+                            if (found) {
+                              setCourier(found.name);
+                              setFraudCourierId(found.id);
+                            }
+                          }}
+                          className="w-full bg-transparent font-semibold text-xs md:text-sm text-gray-900 outline-none appearance-none cursor-pointer pr-6"
                         >
-                           <option value={api.name}>{api.name}</option>
-                           {['Standard', 'Express'].map(c => <option key={c} value={c}>{c} Service</option>)}
+                          {activeCouriers.map(api => (
+                            <option key={api.id} value={api.id}>
+                              {api.name}
+                            </option>
+                          ))}
                         </select>
-                        <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                     </div>
-                     
-                     <button 
-                        onClick={() => {
-                          const trackingId = `${api.id.substring(0, 3).toUpperCase()}-${Math.floor(1000000 + Math.random() * 9000000)}`;
-                          // Simulated API call
-                          const parcelData = {
-                            customer_name: customer.name,
-                            customer_phone: customer.phone,
-                            address: customer.address,
-                            cash_collection: dueAmount,
-                            order_id: id ? editingOrder?.orderId : `ORD-${previewOrderNum}`
-                          };
-                          console.log(`Sending to ${api.name}:`, parcelData);
-                          
-                          setCourier(api.name);
-                          setCourierTrackingId(trackingId);
-                          setCourierStatus('Parcel Created');
-
-                          if (id) {
-                            updateOrder(id, {
-                              courier: {
-                                name: api.name,
-                                trackingId: trackingId,
-                                status: 'Parcel Created'
-                              }
-                            });
-                          }
-                          alert(`Parcel Sent Successfully to ${api.name}!\nTracking ID: ${trackingId}`);
-                        }}
-                        className="w-full h-[54px] bg-gradient-to-br from-[#8e2de2] to-[#c026ff] text-white text-[16px] font-bold rounded-[12px] shadow-lg hover:opacity-90 transition-all active:scale-95 flex items-center justify-center gap-2"
-                     >
-                        <Truck className="w-5 h-5" />
-                        SEND PARCEL INFO
-                     </button>
-
-                     {((editingOrder?.courier?.name === api.name && editingOrder?.courier?.trackingId) || (courier === api.name && courierTrackingId)) && (
-                       <div className="mt-4 pt-4 border-t border-gray-100 bg-purple-50/50 p-4 rounded-xl space-y-2">
-                         <div className="flex items-center justify-between">
-                           <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest">Tracking ID:</span>
-                           <span className="text-[12px] font-black text-black select-all">{courierTrackingId || editingOrder?.courier?.trackingId}</span>
-                         </div>
-                         <div className="flex items-center justify-between">
-                           <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest">Status:</span>
-                           <span className="text-[11px] font-black text-purple-600 uppercase bg-purple-100 px-2 py-0.5 rounded-md">{courierStatus || editingOrder?.courier?.status || 'Parcel Created'}</span>
-                         </div>
-                       </div>
-                     )}
+                        <ChevronDown className="absolute right-0 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                      </div>
+                    </div>
                   </div>
-               </div>
-             ))}
 
-             {activeCouriers.length === 0 && (
-               <div className="bg-white border border-gray-200 p-6 rounded-2xl text-center">
-                 <Truck className="w-8 h-8 text-gray-200 mx-auto mb-2" />
-                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">No Active Couriers</p>
-                 <p className="text-[8px] text-gray-300 mt-1">Enable couriers in Delivery Settings</p>
-               </div>
-             )}
+                  {/* SEND PARCEL INFO Button */}
+                  <button 
+                    type="button"
+                    disabled={isSendingParcel}
+                    onClick={handleSendParcel}
+                    className="w-full h-[54px] bg-gradient-to-br from-[#8e2de2] to-[#c026ff] text-white text-[15px] font-bold rounded-[12px] shadow-lg hover:opacity-95 transition-all active:scale-95 flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
+                  >
+                    {isSendingParcel ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        <span>SENDING TO {selectedCourierItem?.name?.toUpperCase()}...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Truck className="w-5 h-5" />
+                        <span>SEND PARCEL INFO</span>
+                      </>
+                    )}
+                  </button>
+
+                  {/* Parcel Submission Error Message */}
+                  {parcelError && (
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700 flex items-start gap-2">
+                      <AlertTriangle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                      <div className="flex-1">
+                        <p className="font-bold">Parcel Submission Failed</p>
+                        <p className="text-[11px] mt-0.5 leading-relaxed">{parcelError}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Parcel Tracking & Consignment Details */}
+                  {(courierTrackingId || (editingOrder?.courier?.trackingId && editingOrder.courier.name === selectedCourierItem?.name)) && (
+                    <div className="pt-3 border-t border-gray-100 bg-purple-50/60 p-4 rounded-xl space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest">Tracking ID:</span>
+                        <span className="text-[12px] font-mono font-bold text-gray-900 select-all">
+                          {courierTrackingId || editingOrder?.courier?.trackingId}
+                        </span>
+                      </div>
+                      {(courierConsignmentId || editingOrder?.courier?.consignmentId) && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest">Consignment ID:</span>
+                          <span className="text-[11px] font-mono font-semibold text-gray-700 select-all">
+                            {courierConsignmentId || editingOrder?.courier?.consignmentId}
+                          </span>
+                        </div>
+                      )}
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest">Status:</span>
+                        <span className="text-[10px] font-bold text-purple-700 bg-purple-100 px-2 py-0.5 rounded-md uppercase">
+                          {courierStatus || editingOrder?.courier?.status || 'Parcel Created'}
+                        </span>
+                      </div>
+                      {selectedCourierItem && (
+                        <div className="flex items-center justify-between text-[11px] text-gray-500 pt-1 border-t border-purple-100">
+                          <span>Courier:</span>
+                          <span className="font-semibold text-gray-800">{selectedCourierItem.name}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
            </div>
 
            {/* Notes */}
